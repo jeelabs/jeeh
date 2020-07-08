@@ -142,7 +142,7 @@ public:
     constexpr static uint32_t rdr = base + 0x24;
     constexpr static uint32_t tdr = base + 0x28;
 
-    UartDev () {
+    static void init () {
         tx.mode(Pinmode::alt_out, 7);
         rx.mode(Pinmode::alt_out, 7);
 
