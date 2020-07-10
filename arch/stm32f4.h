@@ -1,5 +1,6 @@
 // Hardware access for STM32F4xx family microcontrollers
 // see [1] https://jeelabs.org/ref/STM32F4-RM0090.pdf
+// see [2] https://www.st.com/resource/en/datasheet/stm32f405rg.pdf
 
 #ifndef XTAL
 #define XTAL 8  // the external crystal is usually 8 MHz
@@ -288,24 +289,77 @@ RingBuffer<N> UartBufDev<TX,RX,N>::xmit;
 
 // system clock
 
-static void enableClkAt168MHz () {
-    MMIO32(Periph::flash+0x00) = 0x705; // flash acr, 5 wait states
-    MMIO32(Periph::rcc+0x00) = (1<<16); // HSEON
-    while (Periph::bit(Periph::rcc+0x00, 17) == 0) {} // wait for HSERDY
-    MMIO32(Periph::rcc+0x08) = (4<<13) | (5<<10) | (1<<0); // prescaler w/ HSE
-    MMIO32(Periph::rcc+0x04) = (7<<24) | (1<<22) | (0<<16) | (336<<6) |
-                                (XTAL<<0);
-    Periph::bit(Periph::rcc+0x00, 24) = 1; // PLLON
-    while (Periph::bit(Periph::rcc+0x00, 25) == 0) {} // wait for PLLRDY
-    MMIO32(Periph::rcc+0x08) = (4<<13) | (5<<10) | (2<<0);
-}
+extern void enableClkAt168MHz ();
+extern int fullSpeedClock ();
 
-static int fullSpeedClock () {
-    constexpr uint32_t hz = 168000000;
-    enableClkAt168MHz();                 // using external 8 MHz crystal
-    enableSysTick(hz/1000);              // systick once every 1 ms
-    return hz;
-}
+// analog input using ADC1, ADC2, ADC3
+
+template< int N >
+struct ADC {
+    constexpr static uint32_t base = 0x40012000 + 0x100 * (N - 1); // [1] pp. 66, 430, 432
+    constexpr static uint32_t sr    = base + 0x00;
+    constexpr static uint32_t cr1   = base + 0x04;
+    constexpr static uint32_t cr2   = base + 0x08;
+    constexpr static uint32_t smpr1 = base + 0x0C;
+    constexpr static uint32_t smpr2 = base + 0x10;
+    constexpr static uint32_t sqr3  = base + 0x34;
+    constexpr static uint32_t dr    = base + 0x4C;
+    constexpr static uint32_t ccr   = 0x40012000 + 0x304; // [1] p. 427
+
+    constexpr static uint32_t vref_cal = 0x1FFF7A2A; // [2] p. 139
+    constexpr static uint32_t ts_cal1  = 0x1FFF7A2C; // Temp @  30 C [2] p. 138
+    constexpr static uint32_t ts_cal2  = 0x1FFF7A2E; // Temp @ 110 C [2] p. 138
+
+    // These values can be found in [2] p. 138
+    constexpr static int avg_slope = 25;    // 10 x mV/C
+    constexpr static int vref_25   = 760;   // 760 mV or 0.76V
+
+    static void init () {
+        // ADC is on bus APB2 ([1] p 66)
+        Periph::bit(Periph::rcc+0x44, (N-1)+8) = 1; // enable ADC 1..3; [1] p. 187
+        Periph::bit(ccr, 23) = 1;                 // TSVREFE [1] p. 427
+        Periph::bit(cr2, 0) = 1;                  // ADON [1] p. 420
+        
+#if STM32F42X || STM32F43X
+        constexpr int tchan = 24; // IN18 [1] p.391
+#else // assume F40x or F41x
+        constexpr int tchan = 18; // IN16 [1] p.391
+#endif
+        MMIO32(smpr1) = (7 << 21) | (7 << tchan); // slow temp/vref conv [1] p.420
+    }
+
+    // read analog, given a pin (which is also set to analog input mode)
+    template< typename PIN >
+    static uint16_t read (PIN& pin) {
+        pin.mode(Pinmode::in_analog);           // See [2] pp. 49..50
+        constexpr int off = pin.id < 16 ? 0 :   // A0..A7 => 0..7
+                            pin.id < 32 ? -8 :  // B0..B1 => 8..9
+                                          -22;  // C0..C5 => 10..15
+        return read (pin.id + off);
+    }
+
+    // read direct channel number
+    static uint16_t read (uint8_t chan) {
+        MMIO32(sqr3) = chan;
+        Periph::bit(cr2, 30) = 1;           // Start Regular Channel conversion [1] p. 418
+                                            // TODO: do we want injected ones as well?
+        while (Periph::bit(sr, 1) == 0) {}  // EOC [1] p.415
+        return MMIO32(dr);
+    }
+
+    // result in centidegrees, i.e. 2500 = 25.00°C
+    static int temp () {
+        // For source of temperature formula, see [1] p. 413, [2] p. 138
+        //   Temperature (in *C) = {(VSENSE - V25) / Avg_Slope} + 25
+        auto vsense = (1000 * read(16) * vref()) / 4095;
+        return N == 1 ? (vsense - 10 * vref_25) / avg_slope + 2500 : -1;
+    }
+
+    // result in millivolt
+    static int vref () {
+        return N == 1 ? (3300 * MMIO16(vref_cal)) / read(17) : -1;
+    }
+};
 
 // can bus(es)
 
