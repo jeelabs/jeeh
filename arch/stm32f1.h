@@ -147,9 +147,9 @@ struct UartDev {  // [1] pp.819
                                 TX::id ==  2 ? 1 :  // PA2,  USART2
                                 TX::id == 53 ? 1 :  // PD5,  USART2, remapped
                                 TX::id == 26 ? 2 :  // PB10, USART3
-                                TX::id == 42 ? 2 :  // PC10, USART3, remapped
+                             // TX::id == 42 ? 2 :  // PC10, USART3, remapped
                                 TX::id == 56 ? 2 :  // PD8,  USART3, remapped
-                             // TX::id == 42 ? 3 :  // PC10, UART4
+                                TX::id == 42 ? 3 :  // PC10, UART4
                                 TX::id == 44 ? 4 :  // PC12, UART5
                                                0;   // else  USART1
     constexpr static uint32_t base = uidx == 0 ? 0x40013800 :  // [1] p.50-51
