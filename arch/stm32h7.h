@@ -173,10 +173,11 @@ struct UartDev {
     constexpr static uint32_t base = uidx == 0 ? 0x40011000 : // USART1
                                      uidx == 5 ? 0x40011400 : // USART6
                                                  0x40004000 + 0x400*uidx;
-    constexpr static uint32_t sr  = base + 0x00;
-    constexpr static uint32_t dr  = base + 0x04;
-    constexpr static uint32_t brr = base + 0x08;
-    constexpr static uint32_t cr1 = base + 0x0C;
+    constexpr static uint32_t cr1 = base + 0x00;
+    constexpr static uint32_t brr = base + 0x0C;
+    constexpr static uint32_t isr = base + 0x1C;
+    constexpr static uint32_t rdr = base + 0x24;
+    constexpr static uint32_t tdr = base + 0x28;
 
     static void init () {
         tx.mode(Pinmode::alt_out, 7);
@@ -188,7 +189,7 @@ struct UartDev {
             Periph::bitSet(Periph::rcc+0xE8, 16+uidx); // U(S)ART 2..5
 
         baud(115200);
-        MMIO32(cr1) = (1<<13) | (1<<3) | (1<<2);  // UE, TE, RE
+        MMIO32(cr1) = (1<<3) | (1<<2) | (1<<0);  // TE, RE, UE
     }
 
     static void baud (uint32_t baud, uint32_t hz =defaultHz) {
@@ -196,21 +197,21 @@ struct UartDev {
     }
 
     static bool writable () {
-        return (MMIO32(sr) & (1<<7)) != 0;  // TXE
+        return (MMIO32(isr) & (1<<7)) != 0;  // TXE
     }
 
     static void putc (int c) {
         while (!writable()) {}
-        MMIO32(dr) = (uint8_t) c;
+        MMIO32(tdr) = (uint8_t) c;
     }
 
     static bool readable () {
-        return (MMIO32(sr) & ((1<<5) | (1<<3))) != 0;  // RXNE or ORE
+        return (MMIO32(isr) & ((1<<5) | (1<<3))) != 0;  // RXNE or ORE
     }
 
     static int getc () {
         while (!readable()) {}
-        return MMIO32(dr);
+        return MMIO32(rdr);
     }
 
     static TX tx;
@@ -294,24 +295,8 @@ RingBuffer<N> UartBufDev<TX,RX,N>::xmit;
 
 // system clock
 
-static void enableClkAt216MHz () {
-    MMIO32(Periph::flash+0x00) = 0x705; // flash acr, 5 wait states
-    MMIO32(Periph::rcc+0x00) = (1<<16); // HSEON
-    while (Periph::bit(Periph::rcc+0x00, 17) == 0) {} // wait for HSERDY
-    MMIO32(Periph::rcc+0x08) = (4<<13) | (5<<10) | (1<<0); // prescaler w/ HSE
-    MMIO32(Periph::rcc+0x04) = (7<<24) | (1<<22) | (0<<16) | (336<<6) |
-                                (XTAL<<0);
-    Periph::bitSet(Periph::rcc+0x00, 24); // PLLON
-    while (Periph::bit(Periph::rcc+0x00, 25) == 0) {} // wait for PLLRDY
-    MMIO32(Periph::rcc+0x08) = (4<<13) | (5<<10) | (2<<0);
-}
-
-static int fullSpeedClock () {
-    constexpr uint32_t hz = 216000000;
-    enableClkAt216MHz();                 // using external 8 MHz crystal
-    enableSysTick(hz/1000);              // systick once every 1 ms
-    return hz;
-}
+extern void enableClkAt400MHz ();
+extern int fullSpeedClock ();
 
 // can bus(es)
 

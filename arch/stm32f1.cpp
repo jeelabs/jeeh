@@ -34,7 +34,7 @@ void enableClkAt72MHz () {  // [1] p.49
 
 int fullSpeedClock () {
     constexpr uint32_t hz = 72000000;
-    enableClkAt72MHz();                 // using external 8 MHz crystal
+    enableClkAt72MHz();                 // using external crystal
     enableSysTick(hz/1000);             // systick once every 1 ms
     return hz;
 }
