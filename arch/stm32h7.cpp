@@ -12,15 +12,11 @@ void enableClkAt400MHz () {
     constexpr uint32_t syscfg = 0x58000400;
     Periph::bitSet(syscfg+0x20, 0); // CCCSR EN (I/O compensation)
 
-    MMIO32(Periph::rcc+0x28) = (4<<4) | (0b10<<0); // prescaler w/ HSE
+    MMIO32(Periph::rcc+0x28) = (XTAL<<4) | (0b10<<0); // prescaler w/ HSE
     Periph::bitSet(Periph::rcc+0x00, 16); // HSEON
     while (Periph::bit(Periph::rcc+0x00, 17) == 0) {} // wait for HSERDY
-
-//  MMIO32(Periph::rcc+0x28) = (XTAL<<4) | (0b10<<0); // prescaler w/ HSE
-//  MMIO32(Periph::rcc+0x30) = (0<<24) | (1<<16) | (0<<9) | (399<<0);
-    MMIO32(Periph::rcc+0x28) = (4<<4) | (0b10<<0); // prescaler w/ HSE
-    MMIO32(Periph::rcc+0x2C) = 0x01FF0000; // why? isn't this the pwrup default?
-    MMIO32(Periph::rcc+0x30) = (1<<24) | (3<<16) | (1<<9) | (399<<0);
+    MMIO32(Periph::rcc+0x2C) = 0x00070000; // powerup default is 0! (doc err?)
+    MMIO32(Periph::rcc+0x30) = (0<<24) | (1<<16) | (0<<9) | (399<<0);
     Periph::bitSet(Periph::rcc+0x00, 24); // PLL1ON
     while (Periph::bit(Periph::rcc+0x00, 25) == 0) {} // wait for PLL1RDY
     MMIO32(Periph::rcc+0x18) = (0b100<<4) | (0b1000<<0); // APB3/2, AHB/2
