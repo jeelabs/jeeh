@@ -1,8 +1,18 @@
-struct Periph {
-    constexpr static uint32_t pwr   = 0x40007000;
-    constexpr static uint32_t rcc   = 0x40021000;
-    constexpr static uint32_t flash = 0x40022000;
-    constexpr static uint32_t gpio  = 0x48000000;
+namespace Periph {
+    constexpr uint32_t pwr   = 0x40007000;
+    constexpr uint32_t rcc   = 0x40021000;
+    constexpr uint32_t flash = 0x40022000;
+    constexpr uint32_t gpio  = 0x48000000;
+
+    inline uint32_t bit (uint32_t a, int b) {
+        return (MMIO32(a) >> b) & 1;
+    }
+    inline void bitSet (uint32_t a, int b) {
+        MMIO32(a) |= (1<<b);
+    }
+    inline void bitClear (uint32_t a, int b) {
+        MMIO32(a) &= ~(1<<b);
+    }
 };
 
 // interrupt vector table in ram
@@ -136,6 +146,7 @@ public:
     constexpr static uint32_t base = uidx == 0 ? 0x40013800 :
                                                  0x40004000 + 0x400 * uidx;
     constexpr static uint32_t cr1 = base + 0x00;
+    constexpr static uint32_t cr3 = base + 0x08;
     constexpr static uint32_t brr = base + 0x0C;
     constexpr static uint32_t isr = base + 0x1C;
     constexpr static uint32_t icr = base + 0x20;
@@ -144,7 +155,7 @@ public:
 
     static void init () {
         tx.mode(Pinmode::alt_out, 7);
-        rx.mode(Pinmode::alt_out, 7);
+        rx.mode(Pinmode::in_pullup, 7);
 
         if (uidx == 0)
             MMIO32(Periph::rcc + 0x60) |= 1 << 14; // enable USART1 clock
@@ -156,31 +167,26 @@ public:
     }
 
     static void baud (uint32_t baud, uint32_t hz =defaultHz) {
-        MMIO32(cr1) &= ~(1<<0);              // disable
-        MMIO32(brr) = (hz + baud/2) / baud;  // change while disabled
-        MMIO32(cr1) |= 1<<0;                 // enable
+        MMIO32(brr) = (hz + baud/2) / baud;
     }
 
     static bool writable () {
-        return (MMIO32(isr) & 0x80) != 0;  // TXE
+        return (MMIO32(isr) & (1<<7)) != 0;  // TXE
     }
 
     static void putc (int c) {
-        while (!writable())
-            ;
+        while (!writable()) {}
         MMIO32(tdr) = (uint8_t) c;
     }
 
     static bool readable () {
-        return (MMIO32(isr) & 0x24) != 0;  // RXNE or ORE
+        return (MMIO32(isr) & 0x2F) != 0;  // RXNE, ORE, NF, FE, PE
     }
 
     static int getc () {
-        while (!readable())
-            ;
-        int c = MMIO32(rdr);
-        MMIO32(icr) = 0xA; // clear ORE and FE, reading RDR is not enough
-        return c;
+        while (!readable()) {}
+        MMIO32(icr) = 0x0F; // also clear error flags, RDR read is not enough
+        return MMIO32(rdr);
     }
 
     static TX tx;
@@ -200,6 +206,8 @@ struct UartBufDev : UartDev<TX,RX> {
     typedef UartDev<TX,RX> base;
 
     static void init () {
+        UartDev<TX,RX>::init();
+
         auto handler = []() {
             if (base::readable()) {
                 int c = base::getc();
@@ -211,7 +219,7 @@ struct UartBufDev : UartDev<TX,RX> {
                 if (xmit.avail() > 0)
                     base::putc(xmit.get());
                 else
-                    MMIO32(base::cr1) &= ~(1<<7);  // disable TXEIE
+                    Periph::bitClear(base::cr1, 7);  // disable TXEIE
             }
         };
 
@@ -226,7 +234,8 @@ struct UartBufDev : UartDev<TX,RX> {
         constexpr int irq = 37 + base::uidx;
         MMIO32(nvic_en1r) = 1 << (irq-32);  // enable USART interrupt
 
-        MMIO32(base::cr1) |= (1<<5);  // enable RXNEIE
+        Periph::bitSet(base::cr1, 5);  // enable RXNEIE
+        Periph::bitSet(base::cr3, 0);  // enable EIE
     }
 
     static bool writable () {

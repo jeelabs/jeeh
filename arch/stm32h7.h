@@ -208,7 +208,7 @@ struct UartDev {
     }
 
     static bool readable () {
-        return (MMIO32(isr) & 0x2F) != 0;  // RXNE, ORE, NE, FE, PE
+        return (MMIO32(isr) & 0x2F) != 0;  // RXNE, ORE, NF, FE, PE
     }
 
     static int getc () {
