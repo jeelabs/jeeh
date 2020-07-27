@@ -172,14 +172,17 @@ struct UartDev {
     constexpr static uint32_t base = uidx == 0 ? 0x40011000 : // USART1
                                      uidx == 5 ? 0x40011400 : // USART6
                                                  0x40004000 + 0x400*uidx;
-    constexpr static uint32_t sr  = base + 0x00;
-    constexpr static uint32_t dr  = base + 0x04;
-    constexpr static uint32_t brr = base + 0x08;
-    constexpr static uint32_t cr1 = base + 0x0C;
+    constexpr static uint32_t cr1 = base + 0x00;
+    constexpr static uint32_t cr3 = base + 0x08;
+    constexpr static uint32_t brr = base + 0x0C;
+    constexpr static uint32_t isr = base + 0x1C;
+    constexpr static uint32_t icr = base + 0x20;
+    constexpr static uint32_t rdr = base + 0x24;
+    constexpr static uint32_t tdr = base + 0x28;
 
     static void init () {
         tx.mode(Pinmode::alt_out, 7);
-        rx.mode(Pinmode::alt_out, 7);
+        rx.mode(Pinmode::in_pullup, 7);
 
         if (uidx == 0)
             Periph::bitSet(Periph::rcc+0x44, 4); // enable USART1 clock
@@ -187,7 +190,7 @@ struct UartDev {
             Periph::bitSet(Periph::rcc+0x40, 16+uidx); // U(S)ART 2..5
 
         baud(115200);
-        MMIO32(cr1) = (1<<13) | (1<<3) | (1<<2);  // UE, TE, RE
+        MMIO32(cr1) = (1<<3) | (1<<2) | (1<<0);  // TE, RE, UE
     }
 
     static void baud (uint32_t baud, uint32_t hz =defaultHz) {
@@ -195,21 +198,22 @@ struct UartDev {
     }
 
     static bool writable () {
-        return (MMIO32(sr) & (1<<7)) != 0;  // TXE
+        return (MMIO32(isr) & (1<<7)) != 0;  // TXE
     }
 
     static void putc (int c) {
         while (!writable()) {}
-        MMIO32(dr) = (uint8_t) c;
+        MMIO32(tdr) = (uint8_t) c;
     }
 
     static bool readable () {
-        return (MMIO32(sr) & ((1<<5) | (1<<3))) != 0;  // RXNE or ORE
+        return (MMIO32(isr) & 0x2F) != 0;  // RXNE, ORE, NF, FE, PE
     }
 
     static int getc () {
         while (!readable()) {}
-        return MMIO32(dr);
+        MMIO32(icr) = 0x0F; // also clear error flags, RDR read is not enough
+        return MMIO32(rdr);
     }
 
     static TX tx;
@@ -260,6 +264,7 @@ struct UartBufDev : UartDev<TX,RX> {
         MMIO32(nvic_en1r) = 1 << (irq-32);  // enable USART interrupt
 
         Periph::bitSet(base::cr1, 5);  // enable RXNEIE
+        Periph::bitSet(base::cr3, 0);  // enable EIE
     }
 
     static bool writable () {
