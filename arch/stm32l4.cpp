@@ -2,7 +2,7 @@
 
 #include <jee.h>
 
-static void enableClkAt80MHz () {
+void enableClkAt80MHz () {
     MMIO32(Periph::flash + 0x00) = 0x704; // flash acr, 4 wait states
     MMIO32(Periph::rcc + 0x00) = (1<<8); // HSION
     while ((MMIO32(Periph::rcc + 0x00) & (1<<10)) == 0) ; // wait for HSIRDY
@@ -12,7 +12,7 @@ static void enableClkAt80MHz () {
 	MMIO32(Periph::rcc + 0x08) = (3<<0); // select PLL as SYSCLK, 80 MHz
 }
 
-static int fullSpeedClock () {
+int fullSpeedClock () {
     constexpr uint32_t hz = 80000000;
     enableClkAt80MHz();              // using internal 16 MHz HSI
     enableSysTick(hz/1000);          // systick once every 1 ms
@@ -20,7 +20,7 @@ static int fullSpeedClock () {
     return hz;
 }
 
-static void powerDown (bool standby) {
+void powerDown (bool standby) {
     MMIO32(Periph::rcc+0x58) |= (1<<28); // PWREN
 
     // set to either shutdown or stop 1 mode

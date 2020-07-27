@@ -262,12 +262,12 @@ RingBuffer<N> UartBufDev<TX,RX,N>::xmit;
 
 // system clock
 
-static void enableClkAt80MHz ();
-static int fullSpeedClock ();
+extern void enableClkAt80MHz ();
+extern int fullSpeedClock ();
 
 // low-power modes
 
-static void powerDown (bool standby =true);
+extern void powerDown (bool standby =true);
 
 // can bus
 
