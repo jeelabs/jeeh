@@ -195,7 +195,9 @@ struct UartDev {
     }
 
     static void baud (uint32_t baud, uint32_t hz =defaultHz) {
-        MMIO32(brr) = (hz + baud/2) / baud;
+        MMIO32(cr1) &= ~(1<<0);              // disable
+        MMIO32(brr) = (hz + baud/2) / baud;  // change while disabled
+        MMIO32(cr1) |= 1<<0;                 // enable
     }
 
     static bool writable () {
