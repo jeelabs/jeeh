@@ -26,6 +26,10 @@ public:
         return avail() < N-1;
     }
 
+    bool empty () const {
+        return in == out;
+    }
+
     void put (uint8_t v) {
         uint16_t pos = in;
         buf[pos++] = v;
