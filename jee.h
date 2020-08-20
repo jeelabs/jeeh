@@ -253,6 +253,6 @@ SCL I2cBus<SDA,SCL,N>::scl;
 
 // formatted output
 
-extern void putInt (void (*emit)(int), int val, int base =10, int width =0, char fill =' ');
-extern void veprintf(void (*emit)(int), const char* fmt, va_list ap);
-extern int printf(const char* fmt, ...);  // to be defined in app
+extern void putInt (void (*emit)(int), int v, int b =10, int w =0, char f =' ');
+extern void veprintf (void (*emit)(int), const char* fmt, va_list ap);
+extern "C" int printf (const char* fmt, ...);  // to be defined in app
