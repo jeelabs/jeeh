@@ -174,8 +174,8 @@ struct UartDev {
     constexpr static uint32_t cr1 = base + 0x0C;
 
     static void init () {
-        tx.mode(Pinmode::alt_out, 7);
-        rx.mode(Pinmode::alt_out, 7);
+        TX::mode(Pinmode::alt_out, 7);
+        RX::mode(Pinmode::alt_out, 7);
 
         if (uidx == 0)
             Periph::bit(Periph::rcc+0x44, 4) = 1; // enable USART1 clock
@@ -207,16 +207,7 @@ struct UartDev {
         while (!readable()) {}
         return MMIO32(dr);
     }
-
-    static TX tx;
-    static RX rx;
 };
-
-template< typename TX, typename RX >
-TX UartDev<TX,RX>::tx;
-
-template< typename TX, typename RX >
-RX UartDev<TX,RX>::rx;
 
 // interrupt-enabled uart, sits on top of polled uart
 

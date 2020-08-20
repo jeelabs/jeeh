@@ -154,8 +154,8 @@ public:
     constexpr static uint32_t tdr = base + 0x28;
 
     static void init () {
-        tx.mode(Pinmode::alt_out, 7);
-        rx.mode(Pinmode::in_pullup, 7);
+        TX::mode(Pinmode::alt_out, 7);
+        RX::mode(Pinmode::in_pullup, 7);
 
         if (uidx == 0)
             MMIO32(Periph::rcc + 0x60) |= 1 << 14; // enable USART1 clock
@@ -190,16 +190,7 @@ public:
         MMIO32(icr) = 0x0F; // also clear error flags, RDR read is not enough
         return MMIO32(rdr);
     }
-
-    static TX tx;
-    static RX rx;
 };
-
-template< typename TX, typename RX >
-TX UartDev<TX,RX>::tx;
-
-template< typename TX, typename RX >
-RX UartDev<TX,RX>::rx;
 
 // interrupt-enabled uart, sits of top of polled uart
 

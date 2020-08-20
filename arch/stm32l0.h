@@ -152,8 +152,8 @@ struct UartDev {
     constexpr static uint32_t tdr = base + 0x28;
 
     static void init () {
-        tx.mode(Pinmode::alt_out, 4);
-        rx.mode(Pinmode::alt_out, 4);
+        TX::mode(Pinmode::alt_out, 4);
+        RX::mode(Pinmode::alt_out, 4);
 
         if (uidx == 0)
             MMIO32(Periph::rcc + 0x34) |= 1 << 14; // enable USART1 clock
@@ -191,16 +191,7 @@ struct UartDev {
         MMIO32(icr) = 0xA; // clear ORE and FE, reading RDR is not enough
         return c;
     }
-
-    static TX tx;
-    static RX rx;
 };
-
-template< typename TX, typename RX >
-TX UartDev<TX,RX>::tx;
-
-template< typename TX, typename RX >
-RX UartDev<TX,RX>::rx;
 
 // interrupt-enabled uart, sits of top of polled uart
 
