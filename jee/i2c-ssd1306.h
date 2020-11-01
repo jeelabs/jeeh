@@ -44,13 +44,10 @@ struct SSD1306 {
     }
 
     static void clear () {
-        // this is not needed, since the entire graphics ram will be cleared
-        // in horizontal mode, writes will wrap no matter where they started
-        //
-        // cmd(0xB0);  // SET PAGE START
-        // cmd(0x00);  // SETLOWCOLUMN
-        // cmd(0x10);  // SETHIGHCOLUMN
-        // cmd(0x40);  // SETSTARTLINE
+        cmd(0xB0);  // SET PAGE START
+        cmd(0x00);  // SETLOWCOLUMN
+        cmd(0x10);  // SETHIGHCOLUMN
+        cmd(0x40);  // SETSTARTLINE
 
         I2C::start(addr<<1);
         I2C::write(0x40);
