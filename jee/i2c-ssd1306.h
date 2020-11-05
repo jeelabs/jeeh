@@ -57,7 +57,7 @@ struct SSD1306 {
     }
 
     // data is written in "bands" of 8 pixels high, bit 0 is the topmost line
-    static void copyBand (int x, int y, uint8_t const* ptr, int len) {
+    static void copyBand (int x, int y, uint8_t const* ptr, int len, int step =1) {
         cmd(0xB0 + (y>>3));   // SET PAGE START
         cmd(0x00 + (x&0xF));  // SETLOWCOLUMN
         cmd(0x10 + (x>>4));   // SETHIGHCOLUMN
@@ -65,7 +65,7 @@ struct SSD1306 {
         I2C::start(addr<<1);
         I2C::write(0x40);
         for (int i = 0; i < len; ++i)
-            I2C::write(ptr[i]);
+            I2C::write(ptr[step*i]);
         I2C::stop();
     }
 
