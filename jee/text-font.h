@@ -173,11 +173,12 @@ uint16_t Font17x24<T,S>::x;
 
 template< typename LCD >
 struct TextLcd : LCD {
-    static void copyBand (int x, int y, uint8_t const* ptr, int len) {
+    static void copyBand (int x, int y, uint8_t const* ptr, int len, int step =1) {
         // not very efficient code, but it avoids a large buffer
         uint16_t col [8];
         for (int xi = 0; xi < len; ++xi) {
-            uint8_t v = *ptr++;
+            uint8_t v = *ptr;
+            ptr += step;
             for (int i = 0; i < 8; ++i) {
                 col[i] = v & 1 ? fg : bg;
                 v >>= 1;
