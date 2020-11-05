@@ -12,22 +12,8 @@ struct ILI9325 {
         RD::mode(Pinmode::out); RD::write(1);
         WR::mode(Pinmode::out); WR::write(1);
 
-        PinA<0>::mode(Pinmode::out);
-        PinA<1>::mode(Pinmode::out);
-        PinA<2>::mode(Pinmode::out);
-        PinA<3>::mode(Pinmode::out);
-        PinA<4>::mode(Pinmode::out);
-        PinA<5>::mode(Pinmode::out);
-        PinA<6>::mode(Pinmode::out);
-        PinA<7>::mode(Pinmode::out);
-        PinB<8>::mode(Pinmode::out);
-        PinB<9>::mode(Pinmode::out);
-        PinB<10>::mode(Pinmode::out);
-        PinB<11>::mode(Pinmode::out);
-        PinB<12>::mode(Pinmode::out);
-        PinB<13>::mode(Pinmode::out);
-        PinB<14>::mode(Pinmode::out);
-        PinB<15>::mode(Pinmode::out);
+        Port<'A'>::modeMap(0b0000000011111111, Pinmode::out);
+        Port<'B'>::modeMap(0b1111111100000000, Pinmode::out);
 
         static uint16_t const config [] = {
             0xE7, 0x0010, 0x00, 0x0001, 0x01, 0x0000, 0x02, 0x0700,

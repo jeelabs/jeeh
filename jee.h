@@ -55,6 +55,8 @@ extern void wait_ms (uint32_t ms);
 
 #if STM32F1
 #include "arch/stm32f1.h"
+#elif STM32F3
+#include "arch/stm32f3.h"
 #elif STM32F4
 #include "arch/stm32f4.h"
 #elif STM32F7
