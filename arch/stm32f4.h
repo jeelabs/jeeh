@@ -9,6 +9,7 @@
 namespace Periph {
     constexpr uint32_t rtc   = 0x40002800;
     constexpr uint32_t pwr   = 0x40007000;
+    constexpr uint32_t exti  = 0x40013C00;
     constexpr uint32_t gpio  = 0x40020000;
     constexpr uint32_t rcc   = 0x40023800;
     constexpr uint32_t flash = 0x40023C00;
