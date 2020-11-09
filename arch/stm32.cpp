@@ -93,11 +93,14 @@ void enableClkAt400MHz () {
     constexpr uint32_t syscfg = 0x58000400;
     Periph::bitSet(syscfg+0x20, 0); // CCCSR EN (I/O compensation)
 
-    MMIO32(Periph::rcc+0x28) = (XTAL<<4) | (0b10<<0); // prescaler w/ HSE
+    constexpr int divR = XTAL == 8 ? 2 : 5; // assume 8 or 25 MHz => 4 or 5 MHz
+    constexpr int divN = 400/divR-1;
+
+    MMIO32(Periph::rcc+0x28) = (divR<<4) | (0b10<<0); // prescaler w/ HSE
     Periph::bitSet(Periph::rcc+0x00, 16); // HSEON
     while (Periph::bit(Periph::rcc+0x00, 17) == 0) {} // wait for HSERDY
     MMIO32(Periph::rcc+0x2C) = 0x00070000; // powerup default is 0! (doc err?)
-    MMIO32(Periph::rcc+0x30) = (0<<24) | (1<<16) | (0<<9) | (399<<0);
+    MMIO32(Periph::rcc+0x30) = (0<<24) | (1<<16) | (0<<9) | (divN<<0);
     Periph::bitSet(Periph::rcc+0x00, 24); // PLL1ON
     while (Periph::bit(Periph::rcc+0x00, 25) == 0) {} // wait for PLL1RDY
     MMIO32(Periph::rcc+0x18) = (0b100<<4) | (0b1000<<0); // APB3/2, AHB/2

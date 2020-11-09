@@ -12,6 +12,7 @@ namespace Periph {
     constexpr uint32_t gpio  = 0x58020000;
     constexpr uint32_t rcc   = 0x58024400;
     constexpr uint32_t pwr   = 0x58024800;
+    constexpr uint32_t dwt   = 0xE0001000;
 
     inline uint32_t bit (uint32_t a, int b) {
         return (MMIO32(a) >> b) & 1;
@@ -579,4 +580,28 @@ struct Timer {
         MMIO32(ccr1) = match;
         Periph::bitSet(ccer, 0); // CC1E
     }
+};
+
+// cycle counts, see https://stackoverflow.com/questions/11530593/
+// and https://community.arm.com/developer/tools-software/tools/f/
+//      keil-forum/41930/can-t-write-into-dwt-registers
+// and https://dzone.com/articles/cycle-counting-on-an-arm-cortex-m-with-dwt
+
+struct DWT {
+    constexpr static uint32_t ctrl   = Periph::dwt + 0x000;
+    constexpr static uint32_t cyccnt = Periph::dwt + 0x004;
+    constexpr static uint32_t lar    = Periph::dwt + 0xFB0;
+    constexpr static uint32_t scb_demcr = 0xE000EDFC;
+
+    static void init () {
+        MMIO32(lar) = 0xC5ACCE55;
+        MMIO32(scb_demcr) |= (1<<24); // set TRCENA in DEMCR
+    }
+
+    static void start () {
+        MMIO32(cyccnt) = 0;
+        MMIO32(ctrl) |= 1<<0;
+    }
+    static void stop () { MMIO32(ctrl) &= ~(1<<0); }
+    static uint32_t count () { return MMIO32(cyccnt); }
 };
