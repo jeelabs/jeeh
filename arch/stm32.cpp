@@ -83,7 +83,7 @@ int fullSpeedClock () {
 
 #elif STM32H7
 
-void enableClkAt400MHz () {
+void enableClkPll (int freq) {
     Periph::bitClear(Periph::pwr+0x0C, 2); // CR3 SCUEN
     MMIO32(Periph::pwr+0x18) = (0b11<<14); // D3CR VOS = Scale 1
     while (Periph::bit(Periph::pwr+0x18, 13) == 0) {} // wait for VOSRDY
@@ -93,14 +93,11 @@ void enableClkAt400MHz () {
     constexpr uint32_t syscfg = 0x58000400;
     Periph::bitSet(syscfg+0x20, 0); // CCCSR EN (I/O compensation)
 
-    constexpr int divR = XTAL == 8 ? 2 : 5; // assume 8 or 25 MHz => 4 or 5 MHz
-    constexpr int divN = 400/divR-1;
-
-    MMIO32(Periph::rcc+0x28) = (divR<<4) | (0b10<<0); // prescaler w/ HSE
+    MMIO32(Periph::rcc+0x28) = (XTAL<<4) | (0b10<<0); // prescaler w/ HSE
     Periph::bitSet(Periph::rcc+0x00, 16); // HSEON
     while (Periph::bit(Periph::rcc+0x00, 17) == 0) {} // wait for HSERDY
     MMIO32(Periph::rcc+0x2C) = 0x00070000; // powerup default is 0! (doc err?)
-    MMIO32(Periph::rcc+0x30) = (0<<24) | (1<<16) | (0<<9) | (divN<<0);
+    MMIO32(Periph::rcc+0x30) = (0<<24) | (1<<16) | (0<<9) | ((freq-1)<<0);
     Periph::bitSet(Periph::rcc+0x00, 24); // PLL1ON
     while (Periph::bit(Periph::rcc+0x00, 25) == 0) {} // wait for PLL1RDY
     MMIO32(Periph::rcc+0x18) = (0b100<<4) | (0b1000<<0); // APB3/2, AHB/2
@@ -111,10 +108,11 @@ void enableClkAt400MHz () {
 }
 
 int fullSpeedClock () {
-    constexpr uint32_t hz = 400000000;
-    enableClkAt400MHz();                 // using external crystal
-    enableSysTick(hz/1000);              // systick once every 1 ms
-    return hz;
+    bool max480 = (MMIO32(0x5C001000)>>16) == 0x2003; // revision V
+    uint32_t mhz = max480 ? 480 : 400;
+    enableClkPll(mhz);                   // using external crystal
+    enableSysTick(1000*mhz);             // systick once every 1 ms
+    return 1000000 * mhz;
 }
 
 #elif STM32L0
