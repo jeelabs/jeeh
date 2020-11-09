@@ -2,19 +2,19 @@
 // see [1] https://jeelabs.org/ref/STM32F1-RM0008.pdf
 
 namespace Periph {  // [1] p.49-50
-    constexpr static uint32_t exti  = 0x40010400;
-    constexpr static uint32_t rtc   = 0x40002800;
-    constexpr static uint32_t iwdg  = 0x40003000;
-    constexpr static uint32_t usb   = 0x40005C00;
-    constexpr static uint32_t bkp   = 0x40006C00;
-    constexpr static uint32_t pwr   = 0x40007000;
-    constexpr static uint32_t afio  = 0x40010000;
-    constexpr static uint32_t gpio  = 0x40010800;
-    constexpr static uint32_t rcc   = 0x40021000;
-    constexpr static uint32_t flash = 0x40022000;
-    constexpr static uint32_t crc   = 0x40023000;
+    constexpr uint32_t rtc   = 0x40002800;
+    constexpr uint32_t iwdg  = 0x40003000;
+    constexpr uint32_t usb   = 0x40005C00;
+    constexpr uint32_t bkp   = 0x40006C00;
+    constexpr uint32_t pwr   = 0x40007000;
+    constexpr uint32_t afio  = 0x40010000;
+    constexpr uint32_t exti  = 0x40010400;
+    constexpr uint32_t gpio  = 0x40010800;
+    constexpr uint32_t rcc   = 0x40021000;
+    constexpr uint32_t flash = 0x40022000;
+    constexpr uint32_t crc   = 0x40023000;
 
-    static inline volatile uint32_t& bit (uint32_t a, int b) {
+    inline volatile uint32_t& bit (uint32_t a, int b) {
         return MMIO32(0x42000000 + ((a & 0xFFFFF) << 5) + (b << 2));
     }
 }
