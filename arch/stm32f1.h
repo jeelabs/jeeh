@@ -13,6 +13,7 @@ namespace Periph {  // [1] p.49-50
     constexpr uint32_t rcc   = 0x40021000;
     constexpr uint32_t flash = 0x40022000;
     constexpr uint32_t crc   = 0x40023000;
+    constexpr uint32_t dwt   = 0xE0001000;
 
     inline volatile uint32_t& bit (uint32_t a, int b) {
         return MMIO32(0x42000000 + ((a & 0xFFFFF) << 5) + (b << 2));
@@ -687,4 +688,22 @@ struct Timer {
         //Periph::bit(ccer, 0) = 1; // CC3E
         Periph::bit(ccer, 8) = 1; // CC3E
     }
+};
+
+// cycle counts, see https://stackoverflow.com/questions/11530593/
+
+struct DWT {
+    constexpr static uint32_t ctrl   = Periph::dwt + 0x000;
+    constexpr static uint32_t cyccnt = Periph::dwt + 0x004;
+    constexpr static uint32_t lar    = Periph::dwt + 0xFB0;
+    constexpr static uint32_t scb_demcr = 0xE000EDFC;
+
+    static void init () {
+        MMIO32(lar) = 0xC5ACCE55;
+        MMIO32(scb_demcr) |= (1<<24); // set TRCENA in DEMCR
+    }
+
+    static void start () { MMIO32(cyccnt) = 0; MMIO32(ctrl) |= 1<<0; }
+    static void stop () { MMIO32(ctrl) &= ~(1<<0); }
+    static uint32_t count () { return MMIO32(cyccnt); }
 };

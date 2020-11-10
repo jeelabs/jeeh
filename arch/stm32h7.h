@@ -598,10 +598,7 @@ struct DWT {
         MMIO32(scb_demcr) |= (1<<24); // set TRCENA in DEMCR
     }
 
-    static void start () {
-        MMIO32(cyccnt) = 0;
-        MMIO32(ctrl) |= 1<<0;
-    }
+    static void start () { MMIO32(cyccnt) = 0; MMIO32(ctrl) |= 1<<0; }
     static void stop () { MMIO32(ctrl) &= ~(1<<0); }
     static uint32_t count () { return MMIO32(cyccnt); }
 };
