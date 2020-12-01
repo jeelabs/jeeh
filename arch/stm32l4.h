@@ -155,7 +155,7 @@ public:
 
     static void init () {
         TX::mode(Pinmode::alt_out, 7);
-        RX::mode(Pinmode::in_pullup, 7);
+        RX::mode(Pinmode::alt_out, RX::id == 15 ? 3 : 7); // PA15 is different
 
         if (uidx == 0)
             MMIO32(Periph::rcc + 0x60) |= 1 << 14; // enable USART1 clock
