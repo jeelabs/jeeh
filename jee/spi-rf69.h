@@ -14,26 +14,26 @@
 
 template< typename SPI >
 struct RF69 {
+    void init (uint8_t id, uint8_t group, int freq);
+    void encrypt (const char* key);
+    void txPower (uint8_t level);
+
+    int receive (void* ptr, int len);
+    void send (uint8_t header, const void* ptr, int len);
+    void sleep ();
+
     int16_t afc;
     uint8_t rssi;
     uint8_t lna;
     uint8_t myId;
     uint8_t parity;
 
-    void init (uint8_t id, uint8_t group, int freq);
-    void encrypt (const char* key);
-    void txPower (uint8_t level);
-
-    void listen ();
-    void rssiCapture ();
-    int receive (void* ptr, int len);
-    void send (uint8_t header, const void* ptr, int len);
-    void sleep () { setMode(MODE_SLEEP); }
-
-    static uint8_t readReg (uint8_t addr) { return rwReg(addr, 0); }
-    static void writeReg (uint8_t addr, uint8_t val) { rwReg(addr|0x80, val); }
-    static void setMode (uint8_t newMode) { writeReg(REG_OPMODE, newMode); }
-
+    uint8_t readReg (uint8_t addr) {
+        return rwReg(addr, 0);
+    }
+    void writeReg (uint8_t addr, uint8_t val) {
+        rwReg(addr | 0x80, val);
+    }
     // TODO somewhat redundant to have readReg, writeReg, and rwReg ...
     static uint8_t rwReg (uint8_t cmd, uint8_t val) {
         SPI::enable();
@@ -51,23 +51,53 @@ struct RF69 {
         REG_LNAVALUE      = 0x18,
         REG_AFCMSB        = 0x1F,
         REG_AFCLSB        = 0x20,
+        REG_FEIMSB        = 0x21,
+        REG_FEILSB        = 0x22,
         REG_RSSIVALUE     = 0x24,
         REG_IRQFLAGS1     = 0x27,
         REG_IRQFLAGS2     = 0x28,
         REG_SYNCVALUE1    = 0x2F,
+        REG_SYNCVALUE2    = 0x30,
+        REG_NODEADDR      = 0x39,
+        REG_BCASTADDR     = 0x3A,
+        REG_FIFOTHRESH    = 0x3C,
         REG_PKTCONFIG2    = 0x3D,
         REG_AESKEYMSB     = 0x3E,
 
         MODE_SLEEP        = 0<<2,
         MODE_STANDBY      = 1<<2,
+        MODE_TRANSMIT     = 3<<2,
         MODE_RECEIVE      = 4<<2,
+
+        START_TX          = 0xC2,
+        STOP_TX           = 0x42,
+
+        RCCALSTART        = 0x80,
+        IRQ1_MODEREADY    = 1<<7,
+        IRQ1_RXREADY      = 1<<6,
+        IRQ1_SYNADDRMATCH = 1<<0,
+
+        IRQ2_FIFONOTEMPTY = 1<<6,
+        IRQ2_PACKETSENT   = 1<<3,
+        IRQ2_PAYLOADREADY = 1<<2,
     };
 
+    void setMode (uint8_t newMode);
     void configure (const uint8_t* p);
     void setFrequency (uint32_t freq);
+
+    uint8_t mode;
 };
 
 // driver implementation
+
+template< typename SPI >
+void RF69<SPI>::setMode (uint8_t newMode) {
+    mode = newMode;
+    writeReg(REG_OPMODE, (readReg(REG_OPMODE) & 0xE3) | newMode);
+    while ((readReg(REG_IRQFLAGS1) & IRQ1_MODEREADY) == 0)
+        Yield();
+}
 
 template< typename SPI >
 void RF69<SPI>::setFrequency (uint32_t hz) {
@@ -111,14 +141,13 @@ static const uint8_t configRegs [] = {
     0x1E, 0x0C, // AfcAutoclearOn, AfcAutoOn
     //0x25, 0x40, //0x80, // DioMapping1 = SyncAddress (Rx)
     0x26, 0x07, // disable clkout
-    0x29, 0xC8, // RssiThresh -100 dB
+    0x29, 0xA0, // RssiThresh -80 dB
     0x2D, 0x05, // PreambleSize = 5
-    0x2E, 0x90, // SyncConfig = sync on, sync size = 3
-    0x2F, 0xAA, // SyncValue1 = 0xAA
-    0x30, 0x2D, // SyncValue2 = 0x2D
+    0x2E, 0x88, // SyncConfig = sync on, sync size = 2
+    0x2F, 0x2D, // SyncValue1 = 0x2D
     0x37, 0xD0, // PacketConfig1 = fixed, white, no filtering
     0x38, 0x42, // PayloadLength = 0, unlimited
-    0x3C, 0x82, // FifoTresh, not empty, level 2
+    0x3C, 0x8F, // FifoTresh, not empty, level 15
     0x3D, 0x12, // 0x10, // PacketConfig2, interpkt = 1, autorxrestart off
     0x6F, 0x20, // TestDagc ...
     0x71, 0x02, // RegTestAfc
@@ -143,8 +172,7 @@ void RF69<SPI>::init (uint8_t id, uint8_t group, int freq) {
     configure(configRegs);
     setFrequency(freq);
 
-    writeReg(REG_SYNCVALUE1+2, group);
-    sleep();
+    writeReg(REG_SYNCVALUE2, group);
 }
 
 template< typename SPI >
@@ -167,48 +195,73 @@ void RF69<SPI>::txPower (uint8_t level) {
 }
 
 template< typename SPI >
-void RF69<SPI>::listen () {
-    writeReg(0x3B, 0b01100100); // sleep mode until fifo empty
-    setMode(MODE_RECEIVE);
-}
-
-template< typename SPI >
-void RF69<SPI>::rssiCapture () {
-    // fetch rssi, lnd, and afc
-    rssi = readReg(REG_RSSIVALUE);
-    lna = (readReg(REG_LNAVALUE) >> 3) & 0x7;
-    afc = readReg(REG_AFCMSB) << 8;
-    afc |= readReg(REG_AFCLSB);
+void RF69<SPI>::sleep () {
+    setMode(MODE_SLEEP);
 }
 
 template< typename SPI >
 int RF69<SPI>::receive (void* ptr, int len) {
-    SPI::enable();
-    SPI::transfer(REG_FIFO);
-    int count = SPI::transfer(0);
-    for (int i = 0; i < count; ++i) {
-        uint8_t v = SPI::transfer(0);
-        if (i < len)
-            ((uint8_t*) ptr)[i] = v;
-    }
-    SPI::disable();
+    if (mode != MODE_RECEIVE)
+        setMode(MODE_RECEIVE);
+    else {
+        static uint8_t lastFlag;
+        if ((readReg(REG_IRQFLAGS1) & IRQ1_RXREADY) != lastFlag) {
+            lastFlag ^= IRQ1_RXREADY;
+            if (lastFlag) { // flag just went from 0 to 1
+                rssi = readReg(REG_RSSIVALUE);
+                lna = (readReg(REG_LNAVALUE) >> 3) & 0x7;
+#if RF69_SPI_BULK
+                SPI::enable();
+                SPI::transfer(REG_AFCMSB);
+                afc = SPI::transfer(0) << 8;
+                afc |= SPI::transfer(0);
+                SPI::disable();
+#else
+                afc = readReg(REG_AFCMSB) << 8;
+                afc |= readReg(REG_AFCLSB);
+#endif
+            }
+        }
 
-    // only accept packets intended for us, or broadcasts
-    // ... or any packet if we're the special catch-all node
-    uint8_t dest = *(uint8_t*) ptr;
-    if (count <= 66 && (dest & 0xC0) == parity) {
-        uint8_t destId = dest & 0x3F;
-        if (destId == myId || destId == 0 || myId == 63)
-            return count;
-    }
+        if (readReg(REG_IRQFLAGS2) & IRQ2_PAYLOADREADY) {
 
+#if RF69_SPI_BULK
+            SPI::enable();
+            SPI::transfer(REG_FIFO);
+            int count = SPI::transfer(0);
+            for (int i = 0; i < count; ++i) {
+                uint8_t v = SPI::transfer(0);
+                if (i < len)
+                    ((uint8_t*) ptr)[i] = v;
+            }
+            SPI::disable();
+#else
+            int count = readReg(REG_FIFO);
+            for (int i = 0; i < count; ++i) {
+                uint8_t v = readReg(REG_FIFO);
+                if (i < len)
+                    ((uint8_t*) ptr)[i] = v;
+            }
+#endif
+
+            // only accept packets intended for us, or broadcasts
+            // ... or any packet if we're the special catch-all node
+            uint8_t dest = *(uint8_t*) ptr;
+            if ((dest & 0xC0) == parity) {
+                uint8_t destId = dest & 0x3F;
+                if (destId == myId || destId == 0 || myId == 63)
+                    return count;
+            }
+        }
+    }
     return -1;
 }
 
 template< typename SPI >
 void RF69<SPI>::send (uint8_t header, const void* ptr, int len) {
-    writeReg(0x3B, 0b01011011); // automode: fifolevel + packetsent + tx
+    setMode(MODE_SLEEP);
 
+#if RF69_SPI_BULK
     SPI::enable();
     SPI::transfer(REG_FIFO | 0x80);
     SPI::transfer(len + 2);
@@ -217,4 +270,17 @@ void RF69<SPI>::send (uint8_t header, const void* ptr, int len) {
     for (int i = 0; i < len; ++i)
         SPI::transfer(((const uint8_t*) ptr)[i]);
     SPI::disable();
+#else
+    writeReg(REG_FIFO, len + 2);
+    writeReg(REG_FIFO, (header & 0x3F) | parity);
+    writeReg(REG_FIFO, (header & 0xC0) | myId);
+    for (int i = 0; i < len; ++i)
+        writeReg(REG_FIFO, ((const uint8_t*) ptr)[i]);
+#endif
+
+    setMode(MODE_TRANSMIT);
+    while ((readReg(REG_IRQFLAGS2) & IRQ2_PACKETSENT) == 0)
+        Yield();
+
+    setMode(MODE_STANDBY);
 }
