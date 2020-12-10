@@ -344,3 +344,59 @@ struct CanDev {
         return len;
     }
 };
+
+// flash memory writing and erasing
+
+struct Flash {
+    constexpr static uint32_t keyr = Periph::flash + 0x08;
+    constexpr static uint32_t sr   = Periph::flash + 0x10;
+    constexpr static uint32_t cr   = Periph::flash + 0x14;
+
+    static void write64 (void const* addr, uint32_t val1, uint32_t val2) {
+        if (*(uint32_t*) addr != 0xFFFFFFFF)
+            return;
+        unlock();
+        Periph::bitSet(cr, 0); // PG
+        MMIO32((uint32_t) addr | 0x08000000) = val1;
+        MMIO32((uint32_t) addr | 0x08000004) = val2;
+        wait();
+    }
+
+#if 0 // incorrect
+    static void write32buf (void const* a, uint32_t const* ptr, int len) {
+        if (*(uint32_t*) a != 0xFFFFFFFF)
+            return;
+        unlock();
+        MMIO32(cr) = (2<<8) | (1<<0); // PSIZE, PG
+        for (int i = 0; i < len; ++i)
+            MMIO32(((uint32_t) a + 4*i) | 0x08000000) = ptr[i];
+        wait();
+    }
+#endif
+
+    static void erasePage (void const* addr) {
+        uint32_t a = (uint32_t) addr & 0x07FFFFFF;
+        // sectors are 2 KB
+        int sector = a >> 11;
+        unlock();
+        MMIO32(cr) = (sector<<3) | (1<<1); // SNB PER
+        Periph::bitSet(cr, 16); // STRT
+        finish();
+    }
+
+    static void unlock () {
+        if (Periph::bit(cr, 31)) {
+            MMIO32(keyr) = 0x45670123;
+            MMIO32(keyr) = 0xCDEF89AB;
+        }
+    }
+
+    static void wait () {
+        while (Periph::bit(sr, 16)) {}
+    }
+
+    static void finish () {
+        wait();
+        MMIO32(cr) = 1<<31; // LOCK
+    }
+};
