@@ -146,3 +146,16 @@ void veprintf(void (*emit)(int), char const* fmt, va_list ap) {
             emit(c);
     }
 }
+
+int sprintf (char* buf, const char* fmt, ...) {
+    static char* ptr; // not re-entrant
+    ptr = buf;
+
+    va_list ap;
+    va_start(ap, fmt);
+    veprintf([](int c) { *ptr++ = c; }, fmt, ap);
+    va_end(ap);
+
+    *ptr = 0;
+    return ptr - buf;
+}

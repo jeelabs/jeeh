@@ -260,3 +260,4 @@ SCL I2cBus<SDA,SCL,N>::scl;
 extern void putInt (void (*emit)(int), int v, int b =10, int w =0, char f =' ');
 extern void veprintf (void (*emit)(int), const char* fmt, va_list ap);
 extern "C" int printf (const char* fmt, ...);  // to be defined in app
+extern "C" int sprintf (char* buf, const char* fmt, ...);
