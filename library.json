@@ -1,7 +1,7 @@
 {
     "name": "JeeH",
     "description": "Headers for framework- and platform-agnostic code",
-    "version": "1.14",
+    "version": "1.15",
     "keywords": "experimental",
     "authors": {
         "name": "Jean-Claude Wippler",
