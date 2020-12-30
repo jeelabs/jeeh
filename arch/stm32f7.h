@@ -160,14 +160,17 @@ struct Pin {
 template< typename TX, typename RX >
 struct UartDev {
     // TODO does not recognise alternate TX pins
-    constexpr static int uidx = TX::id ==  2 ? 1 :  // PA2, USART2
-                                TX::id ==  9 ? 0 :  // PA9, USART1
-                                TX::id == 22 ? 0 :  // PB6, USART1
-                                TX::id == 26 ? 2 :  // PB10, USART3
-                                TX::id == 42 ? 2 :  // PC10, USART3
-                                TX::id == 53 ? 1 :  // PD5, USART2
-                                TX::id == 56 ? 2 :  // PD8, USART3
-                                // TODO more possible, using alt mode 8 iso 7
+    constexpr static int uidx = TX::id ==   2 ? 1 :  // PA2, USART2
+                                TX::id ==   9 ? 0 :  // PA9, USART1
+                                TX::id ==  22 ? 0 :  // PB6, USART1
+                                TX::id ==  26 ? 2 :  // PB10, USART3
+                                TX::id ==  42 ? 2 :  // PC10, USART3
+                                TX::id ==  53 ? 1 :  // PD5, USART2
+                                TX::id ==  56 ? 2 :  // PD8, USART3
+                                TX::id ==  38 ? 5 :  // PC6, USART6
+                                TX::id ==  44 ? 4 :  // PC12, USART5
+                                TX::id == 110 ? 5 :  // PG14, USART6
+                                TX::id == 125 ? 3 :  // PH13, USART4
                                                0;   // else USART1
     constexpr static uint32_t base = uidx == 0 ? 0x40011000 : // USART1
                                      uidx == 5 ? 0x40011400 : // USART6
@@ -181,13 +184,15 @@ struct UartDev {
     constexpr static uint32_t tdr = base + 0x28;
 
     static void init () {
-        tx.mode(Pinmode::alt_out, 7);
-        rx.mode(Pinmode::in_pullup, 7);
+        constexpr auto ualt = uidx >= 4 ? 8 : 7;
+        TX::mode(Pinmode::alt_out, ualt);
+        RX::mode(Pinmode::in_pullup, ualt);
 
-        if (uidx == 0)
-            Periph::bitSet(Periph::rcc+0x44, 4); // enable USART1 clock
-        else
-            Periph::bitSet(Periph::rcc+0x40, 16+uidx); // U(S)ART 2..5
+        switch (uidx) { // enable U(S)ART clock
+            case 0:  Periph::bitSet(Periph::rcc+0x44, 4); break; // USART 1
+            case 5:  Periph::bitSet(Periph::rcc+0x44, 5); break; // USART 6
+            default: Periph::bitSet(Periph::rcc+0x40, 16+uidx);  // UART 2..5
+        }
 
         baud(115200);
         MMIO32(cr1) = (1<<3) | (1<<2) | (1<<0);  // TE, RE, UE
@@ -217,16 +222,7 @@ struct UartDev {
         MMIO32(icr) = 0x0F; // also clear error flags, RDR read is not enough
         return MMIO32(rdr);
     }
-
-    static TX tx;
-    static RX rx;
 };
-
-template< typename TX, typename RX >
-TX UartDev<TX,RX>::tx;
-
-template< typename TX, typename RX >
-RX UartDev<TX,RX>::rx;
 
 // interrupt-enabled uart, sits on top of polled uart
 
@@ -235,7 +231,7 @@ struct UartBufDev : UartDev<TX,RX> {
     typedef UartDev<TX,RX> base;
 
     static void init () {
-        UartDev<TX,RX>::init();
+        base::init();
 
         auto handler = []() {
             if (base::readable()) {
@@ -258,12 +254,19 @@ struct UartBufDev : UartDev<TX,RX> {
             case 2: VTableRam().usart3 = handler; break;
             case 3: VTableRam().uart4  = handler; break;
             case 4: VTableRam().uart5  = handler; break;
+            case 5: VTableRam().usart6 = handler; break;
         }
 
-        // nvic interrupt numbers are 37, 38, 39, 52, and 53, respectively
-        constexpr uint32_t nvic_en1r = 0xE000E104;
-        constexpr int irq = (base::uidx < 3 ? 37 : 49) + base::uidx;
-        MMIO32(nvic_en1r) = 1 << (irq-32);  // enable USART interrupt
+        if (base::uidx != 5) {
+            // nvic interrupt numbers are 37, 38, 39, 52, and 53, respectively
+            constexpr uint32_t nvic_en1r = 0xE000E104;
+            constexpr int irq = (base::uidx < 3 ? 37 : 49) + base::uidx;
+            MMIO32(nvic_en1r) = 1 << (irq-32);  // enable USART interrupt
+        } else {
+            constexpr uint32_t nvic_en2r = 0xE000E108;
+            constexpr int irq = 71;
+            MMIO32(nvic_en2r) = 1 << (irq-64);  // enable USART interrupt
+        }
 
         Periph::bitSet(base::cr1, 5);  // enable RXNEIE
         Periph::bitSet(base::cr3, 0);  // enable EIE
