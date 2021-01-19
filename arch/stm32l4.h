@@ -194,14 +194,26 @@ public:
 
 // interrupt-enabled uart, sits of top of polled uart
 
-template< typename TX, typename RX, int N =50 >
+template< typename TX, typename RX, int NTX =25, int NRX =NTX >
 struct UartBufDev : UartDev<TX,RX> {
     typedef UartDev<TX,RX> base;
+
+    // handler is a function which returns a reference to a function pointer ...
+    static void (*& handler ())() {
+        switch (base::uidx) {
+            default:
+            case 0: return VTableRam().usart1;
+            case 1: return VTableRam().usart2;
+            case 2: return VTableRam().usart3;
+            case 3: return VTableRam().uart4;
+            case 4: return VTableRam().uart5;
+        }
+    }
 
     static void init () {
         UartDev<TX,RX>::init();
 
-        auto handler = []() {
+        handler() = []() {
             if (base::readable()) {
                 int c = base::getc();
                 if (recv.free())
@@ -215,12 +227,6 @@ struct UartBufDev : UartDev<TX,RX> {
                     Periph::bitClear(base::cr1, 7);  // disable TXEIE
             }
         };
-
-        switch (base::uidx) {
-            case 0: VTableRam().usart1 = handler; break;
-            case 1: VTableRam().usart2 = handler; break;
-            case 2: VTableRam().usart3 = handler; break;
-        }
 
         // nvic interrupt numbers are 37, 38, and 39, respectively
         constexpr uint32_t nvic_en1r = 0xE000E104;
@@ -236,8 +242,7 @@ struct UartBufDev : UartDev<TX,RX> {
     }
 
     static void putc (int c) {
-        while (!writable())
-            ;
+        while (!writable()) {}
         xmit.put(c);
         MMIO32(base::cr1) |= (1<<7);  // enable TXEIE
     }
@@ -247,20 +252,19 @@ struct UartBufDev : UartDev<TX,RX> {
     }
 
     static int getc () {
-        while (!readable())
-            ;
+        while (!readable()) {}
         return recv.get();
     }
 
-    static RingBuffer<N> recv;
-    static RingBuffer<N> xmit;
+    static RingBuffer<NRX> recv;
+    static RingBuffer<NTX> xmit;
 };
 
-template< typename TX, typename RX, int N >
-RingBuffer<N> UartBufDev<TX,RX,N>::recv;
+template< typename TX, typename RX, int NTX, int NRX >
+RingBuffer<NRX> UartBufDev<TX,RX,NTX,NRX>::recv;
 
-template< typename TX, typename RX, int N >
-RingBuffer<N> UartBufDev<TX,RX,N>::xmit;
+template< typename TX, typename RX, int NTX, int NRX >
+RingBuffer<NTX> UartBufDev<TX,RX,NTX,NRX>::xmit;
 
 // system clock
 

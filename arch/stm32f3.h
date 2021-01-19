@@ -228,10 +228,22 @@ template< typename TX, typename RX, int N =50 >
 struct UartBufDev : UartDev<TX,RX> {
     typedef UartDev<TX,RX> base;
 
+    // handler is a function which returns a reference to a function pointer ...
+    static void (*& handler ())() {
+        switch (base::uidx) {
+            default:
+            case 0: return VTableRam().usart1;
+            case 1: return VTableRam().usart2;
+            case 2: return VTableRam().usart3;
+            case 3: return VTableRam().uart4;
+            case 4: return VTableRam().uart5;
+        }
+    }
+
     static void init () {
         UartDev<TX,RX>::init();
 
-        auto handler = []() {
+        handler() = []() {
             if (base::readable()) {
                 int c = base::getc();
                 if (recv.free())
@@ -245,14 +257,6 @@ struct UartBufDev : UartDev<TX,RX> {
                     Periph::bitClear(base::cr1, 7);  // disable TXEIE
             }
         };
-
-        switch (base::uidx) {
-            case 0: VTableRam().usart1 = handler; break;
-            case 1: VTableRam().usart2 = handler; break;
-            case 2: VTableRam().usart3 = handler; break;
-            case 3: VTableRam().uart4  = handler; break;
-            case 4: VTableRam().uart5  = handler; break;
-        }
 
         // nvic interrupt numbers are 37, 38, 39, 52, and 53, respectively
         constexpr uint32_t nvic_en1r = 0xE000E104;
