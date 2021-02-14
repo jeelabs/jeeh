@@ -30,6 +30,10 @@ public:
         return in == out;
     }
 
+    bool almostEmpty () const {
+        return avail() <= (N < 8 ? 2 : N/4);
+    }
+
     void put (uint8_t v) {
         uint16_t pos = in;
         buf[pos++] = v;
