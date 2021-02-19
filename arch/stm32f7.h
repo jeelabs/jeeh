@@ -58,7 +58,7 @@ extern void enableSysTick (uint32_t divider =defaultHz/1000);
 // gpio
 
 enum class Pinmode {
-    // mode (2), typer (1), pupdr (2)
+    // speedr (2), mode (2), typer (1), pupdr (2)
     in_analog         = 0b0011000,
     in_float          = 0b0000000,
     in_pulldown       = 0b0000010,
@@ -109,10 +109,10 @@ struct Port {
 
         int p2 = 2*pin;
         auto mval = static_cast<int>(m);
-        MMIO32(ospeedr) = (MMIO32(ospeedr) & ~(3<<p2)) | (((mval>>5)&3) << p2);
         MMIO32(moder) = (MMIO32(moder) & ~(3<<p2)) | (((mval>>3)&3) << p2);
         MMIO32(typer) = (MMIO32(typer) & ~(1<<pin)) | (((mval>>2)&1) << pin);
         MMIO32(pupdr) = (MMIO32(pupdr) & ~(3<<p2)) | ((mval&3) << p2);
+        MMIO32(ospeedr) = (MMIO32(ospeedr) & ~(3<<p2)) | (((mval>>5)&3) << p2);
     }
 
     static void modeMap (uint16_t pins, Pinmode m, int alt =0) {

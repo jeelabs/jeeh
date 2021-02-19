@@ -19,6 +19,8 @@ namespace Periph {
     inline volatile uint32_t& bit (uint32_t a, int b) {
         return MMIO32(0x42000000 + ((a & 0xFFFFF) << 5) + (b << 2));
     }
+    inline void bitSet (uint32_t a, int b) { bit(1, b) = 1; }
+    inline void bitClear (uint32_t a, int b) { bit(1, b) = 0; }
 }
 
 // interrupt vector table in ram
@@ -106,10 +108,10 @@ struct Port {
 
         int p2 = 2*pin;
         auto mval = static_cast<int>(m);
-        MMIO32(ospeedr) = (MMIO32(ospeedr) & ~(3<<p2)) | (((mval>>5)&3) << p2);
         MMIO32(moder) = (MMIO32(moder) & ~(3<<p2)) | (((mval>>3)&3) << p2);
         MMIO32(typer) = (MMIO32(typer) & ~(1<<pin)) | (((mval>>2)&1) << pin);
         MMIO32(pupdr) = (MMIO32(pupdr) & ~(3<<p2)) | ((mval&3) << p2);
+        MMIO32(ospeedr) = (MMIO32(ospeedr) & ~(3<<p2)) | (((mval>>5)&3) << p2);
     }
 
     static void modeMap (uint16_t pins, Pinmode m, int alt =0) {
