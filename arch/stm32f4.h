@@ -19,8 +19,8 @@ namespace Periph {
     inline volatile uint32_t& bit (uint32_t a, int b) {
         return MMIO32(0x42000000 + ((a & 0xFFFFF) << 5) + (b << 2));
     }
-    inline void bitSet (uint32_t a, int b) { bit(1, b) = 1; }
-    inline void bitClear (uint32_t a, int b) { bit(1, b) = 0; }
+    inline void bitSet (uint32_t a, int b) { bit(a, b) = 1; }
+    inline void bitClear (uint32_t a, int b) { bit(a, b) = 0; }
 }
 
 // interrupt vector table in ram
@@ -178,7 +178,7 @@ struct UartDev {
 
     static void init () {
         TX::mode(Pinmode::alt_out, 7);
-        RX::mode(Pinmode::alt_out, 7);
+        RX::mode(Pinmode::in_pullup, 7);
 
         if (uidx == 0)
             Periph::bit(Periph::rcc+0x44, 4) = 1; // enable USART1 clock

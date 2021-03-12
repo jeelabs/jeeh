@@ -5,15 +5,9 @@ namespace Periph {
     constexpr uint32_t flash = 0x40022000;
     constexpr uint32_t gpio  = 0x48000000;
 
-    inline uint32_t bit (uint32_t a, int b) {
-        return (MMIO32(a) >> b) & 1;
-    }
-    inline void bitSet (uint32_t a, int b) {
-        MMIO32(a) |= (1<<b);
-    }
-    inline void bitClear (uint32_t a, int b) {
-        MMIO32(a) &= ~(1<<b);
-    }
+    inline uint32_t bit (uint32_t a, int b) { return (MMIO32(a) >> b) & 1; }
+    inline void bitSet (uint32_t a, int b) { MMIO32(a) |= (1<<b); }
+    inline void bitClear (uint32_t a, int b) { MMIO32(a) &= ~(1<<b); }
 };
 
 // interrupt vector table in ram
