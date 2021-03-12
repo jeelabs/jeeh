@@ -178,7 +178,7 @@ struct UartDev {
 
     static void init () {
         TX::mode(Pinmode::alt_out, 7);
-        RX::mode(Pinmode::in_pullup, 7);
+        RX::mode(Pinmode::alt_out, 7);
 
         if (uidx == 0)
             Periph::bit(Periph::rcc+0x44, 4) = 1; // enable USART1 clock
