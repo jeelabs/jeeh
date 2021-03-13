@@ -61,7 +61,7 @@ int fullSpeedClock () {
 }
 
 void powerDown (bool standby) {
-    Periph::bit(Periph::rcc+0x1C, 28) = 1; // PWREN
+    Periph::bit(Periph::rcc+0x40, 28) = 1; // PWREN
     Periph::bit(Periph::pwr, 1) = standby ? 1 : 0;  // PDDS if standby
 
     constexpr uint32_t scr = 0xE000ED10;
