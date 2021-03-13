@@ -78,17 +78,16 @@ struct Port {
         // enable GPIOx clock
         MMIO32(Periph::rcc+0x2C) |= (1<<(port-'A'));
 
-        // set the alternate mode before switching to it
-        uint32_t afr = pin & 8 ? afrh : afrl;
-        int shift = 4 * (pin & 7);
-        MMIO32(afr) = (MMIO32(afr) & ~(0xF << shift)) | (alt << shift);
-
         int p2 = 2*pin;
         auto mval = static_cast<int>(m);
         MMIO32(moder) = (MMIO32(moder) & ~(3<<p2)) | (((mval>>3)&3) << p2);
         MMIO32(typer) = (MMIO32(typer) & ~(1<<pin)) | (((mval>>2)&1) << pin);
         MMIO32(pupdr) = (MMIO32(pupdr) & ~(3<<p2)) | ((mval&3) << p2);
         MMIO32(ospeedr) = (MMIO32(ospeedr) & ~(3<<p2)) | (((mval>>5)&3) << p2);
+
+        uint32_t afr = pin & 8 ? afrh : afrl;
+        int shift = 4 * (pin & 7);
+        MMIO32(afr) = (MMIO32(afr) & ~(0xF << shift)) | (alt << shift);
     }
 
     static void modeMap (uint16_t pins, Pinmode m, int alt =0) {
