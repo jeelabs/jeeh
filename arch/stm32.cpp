@@ -91,6 +91,19 @@ int fullSpeedClock () {
     return hz;
 }
 
+void powerDown (bool standby) {
+    Periph::bitSet(Periph::rcc+0x40, 28); // PWREN
+    if (standby)
+        Periph::bitSet(Periph::pwr, 1);   // set PDDS
+    else
+        Periph::bitClear(Periph::pwr, 1); // clear PDDS
+
+    constexpr uint32_t scr = 0xE000ED10;
+    MMIO32(scr) |= (1<<2);  // set SLEEPDEEP
+
+    __asm("wfe");
+}
+
 #elif STM32H7
 
 void enableClkPll (int freq) {
@@ -123,6 +136,19 @@ int fullSpeedClock () {
     enableClkPll(mhz);                   // using external crystal
     enableSysTick(1000*mhz);             // systick once every 1 ms
     return 1000000 * mhz;
+}
+
+void powerDown (bool standby) {
+    //Periph::bit(Periph::rcc+0xE8, 28) = 1; // not on H7: PWREN ???
+    if (standby)
+        MMIO32(Periph::pwr) |= 0b111;      // set PDDS D1/D2/D3
+    else
+        MMIO32(Periph::pwr) &= ~0b111;     // clearPDDS D1/D2/D3
+
+    constexpr uint32_t scr = 0xE000ED10;
+    MMIO32(scr) |= (1<<2);  // set SLEEPDEEP
+
+    __asm("wfe");
 }
 
 #elif STM32L0

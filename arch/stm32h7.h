@@ -9,6 +9,7 @@ namespace Periph {
     constexpr uint32_t flash = 0x52002000;
     constexpr uint32_t fmc   = 0x52004000;
     constexpr uint32_t rtc   = 0x58004000;
+    constexpr uint32_t iwdg  = 0x58004800;
     constexpr uint32_t gpio  = 0x58020000;
     constexpr uint32_t rcc   = 0x58024400;
     constexpr uint32_t pwr   = 0x58024800;
@@ -178,7 +179,7 @@ struct UartDev {
 
     static void init () {
         tx.mode(Pinmode::alt_out, 7);
-        rx.mode(Pinmode::in_pullup, 7);
+        rx.mode(Pinmode::alt_out, 7);
 
         if (uidx == 0)
             Periph::bitSet(Periph::rcc+0xF0, 4); // enable USART1 clock
@@ -305,6 +306,10 @@ RingBuffer<N> UartBufDev<TX,RX,N>::xmit;
 
 extern void enableClkAt400MHz ();
 extern int fullSpeedClock ();
+
+// low-power modes
+
+extern void powerDown (bool standby =true);
 
 // can bus(es)
 
@@ -602,4 +607,31 @@ struct DWT {
     static void start () { MMIO32(cyccnt) = 0; MMIO32(ctrl) |= 1<<0; }
     static void stop () { MMIO32(ctrl) &= ~(1<<0); }
     static uint32_t count () { return MMIO32(cyccnt); }
+};
+
+// independent watchdog
+
+struct Iwdg {  // [1] pp.495
+    constexpr static uint32_t kr  = Periph::iwdg + 0x00;
+    constexpr static uint32_t pr  = Periph::iwdg + 0x04;
+    constexpr static uint32_t rlr = Periph::iwdg + 0x08;
+    constexpr static uint32_t sr  = Periph::iwdg + 0x0C;
+
+    Iwdg (int rate =7) {
+        while (Periph::bit(sr, 0)) {}  // wait until !PVU
+        MMIO32(kr) = 0x5555;   // unlock PR
+        MMIO32(pr) = rate;     // max timeout, 0 = 400ms, 7 = 26s
+        MMIO32(kr) = 0xCCCC;   // start watchdog
+    }
+
+    static void kick () {
+        MMIO32(kr) = 0xAAAA;  // reset the watchdog timout
+    }
+
+    static void reload (int n) {
+        while (Periph::bit(sr, 1)) {}  // wait until !RVU
+        MMIO32(kr) = 0x5555;   // unlock PR
+        MMIO32(rlr) = n;
+        kick();
+    }
 };
