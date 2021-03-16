@@ -13,6 +13,7 @@ namespace Periph {
     constexpr uint32_t rcc   = 0x40023800;
     constexpr uint32_t flash = 0x40023C00;
     constexpr uint32_t fmc   = 0xA0000000;
+    constexpr uint32_t dwt   = 0xE0001000;
 
     inline uint32_t bit (uint32_t a, int b) { return (MMIO32(a) >> b) & 1; }
     inline void bitSet (uint32_t a, int b) { MMIO32(a) |= (1<<b); }
@@ -612,4 +613,22 @@ struct Iwdg {  // [1] pp.495
         MMIO32(rlr) = n;
         kick();
     }
+};
+
+// cycle counts, see https://stackoverflow.com/questions/11530593/
+
+struct DWT {
+    constexpr static uint32_t ctrl   = Periph::dwt + 0x000;
+    constexpr static uint32_t cyccnt = Periph::dwt + 0x004;
+    constexpr static uint32_t lar    = Periph::dwt + 0xFB0;
+    constexpr static uint32_t scb_demcr = 0xE000EDFC;
+
+    static void init () {
+        MMIO32(lar) = 0xC5ACCE55;
+        MMIO32(scb_demcr) |= (1<<24); // set TRCENA in DEMCR
+    }
+
+    static void start () { MMIO32(cyccnt) = 0; MMIO32(ctrl) |= 1<<0; }
+    static void stop () { MMIO32(ctrl) &= ~(1<<0); }
+    static uint32_t count () { return MMIO32(cyccnt); }
 };
