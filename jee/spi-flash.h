@@ -29,6 +29,13 @@ class SpiFlash {
 public:
     static void init () {}
 
+    static void reset () {
+        cmd(0x66);
+        SPI::disable();
+        cmd(0x99);
+        SPI::disable();
+    }
+
     static int devId () {
         cmd(0x9F);
         int r = SPI::transfer(0) << 16;
@@ -44,7 +51,7 @@ public:
     }
 
     static void wipe () {
-        wcmd(0x60);
+        wcmd(0xC7); // 0x60 doesn't work on Micron Tech (N25Q)
         wait();
     }
 
@@ -59,8 +66,9 @@ public:
     }
 
     static void read (int offset, void* buf, int cnt) {
-        cmd(0x03);
+        cmd(0x0B);
         w24b(offset);
+        SPI::transfer(0);
         for (int i = 0; i < cnt; ++i)
             ((uint8_t*) buf)[i] = SPI::transfer(0);
         SPI::disable();

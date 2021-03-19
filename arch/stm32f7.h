@@ -166,7 +166,7 @@ struct UartDev {
                                 TX::id ==  44 ? 4 :  // PC12, USART5
                                 TX::id == 110 ? 5 :  // PG14, USART6
                                 TX::id == 125 ? 3 :  // PH13, USART4
-                                               0;   // else USART1
+                                                0;   // else USART1
     constexpr static uint32_t base = uidx == 0 ? 0x40011000 : // USART1
                                      uidx == 5 ? 0x40011400 : // USART6
                                                  0x40004000 + 0x400*uidx;

@@ -324,7 +324,7 @@ struct ADC {
         Periph::bit(Periph::rcc+0x44, (N-1)+8) = 1; // enable ADC 1..3; [1] p. 187
         Periph::bit(ccr, 23) = 1;                 // TSVREFE [1] p. 427
         Periph::bit(cr2, 0) = 1;                  // ADON [1] p. 420
-        
+
 #if STM32F42X || STM32F43X
         constexpr int tchan = 24; // IN18 [1] p.391
 #else // assume F40x or F41x
@@ -643,17 +643,6 @@ struct Timer {
     }
 };
 
-// cycle counts, see https://stackoverflow.com/questions/11530593/
-
-struct DWT {
-    constexpr static uint32_t ctrl   = Periph::dwt + 0x0;
-    constexpr static uint32_t cyccnt = Periph::dwt + 0x4;
-
-    static void start () { MMIO32(cyccnt) = 0; MMIO32(ctrl) |= 1<<0; }
-    static void stop () { MMIO32(ctrl) &= ~(1<<0); }
-    static uint32_t count () { return MMIO32(cyccnt); }
-};
-
 // independent watchdog
 
 struct Iwdg {  // [1] pp.495
@@ -679,4 +668,17 @@ struct Iwdg {  // [1] pp.495
         MMIO32(rlr) = n;
         kick();
     }
+};
+
+// cycle counts, see https://stackoverflow.com/questions/11530593/
+
+struct DWT {
+    constexpr static uint32_t ctrl   = Periph::dwt + 0x0;
+    constexpr static uint32_t cyccnt = Periph::dwt + 0x4;
+
+    static void init () {} // TODO noop?
+
+    static void start () { MMIO32(cyccnt) = 0; MMIO32(ctrl) |= 1<<0; }
+    static void stop () { MMIO32(ctrl) &= ~(1<<0); }
+    static uint32_t count () { return MMIO32(cyccnt); }
 };
