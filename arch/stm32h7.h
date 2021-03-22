@@ -304,7 +304,7 @@ RingBuffer<N> UartBufDev<TX,RX,N>::xmit;
 
 // system clock
 
-extern void enableClkAt400MHz ();
+extern void enableClkPll (int freq);
 extern int fullSpeedClock ();
 
 // low-power modes
