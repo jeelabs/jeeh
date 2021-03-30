@@ -30,7 +30,7 @@ struct VTable {
 // systick and delays
 
 constexpr static int defaultHz = 16000000;
-extern void enableSysTick (uint32_t divider =defaultHz/1000);
+extern void enableSysTick (uint32_t divider =defaultHz/1000) __attribute__((weak));
 
 // gpio
 

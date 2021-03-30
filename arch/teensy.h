@@ -8,7 +8,7 @@ extern int myMain ();
 #define wait_ms delay
 #define ticks millis()
 
-extern void enableSysTick (uint32_t divider =0);
+extern void enableSysTick (uint32_t divider =0) __attribute__((weak));
 
 enum class Pinmode {
     in_float  = INPUT,

@@ -5,9 +5,11 @@ namespace Periph {
     constexpr uint32_t flash = 0x40022000;
     constexpr uint32_t gpio  = 0x48000000;
 
-    inline uint32_t bit (uint32_t a, int b) { return (MMIO32(a) >> b) & 1; }
-    inline void bitSet (uint32_t a, int b) { MMIO32(a) |= (1<<b); }
-    inline void bitClear (uint32_t a, int b) { MMIO32(a) &= ~(1<<b); }
+    inline volatile uint32_t& bit (uint32_t a, int b) {
+        return MMIO32(0x42000000 + ((a & 0xFFFFF) << 5) + (b << 2));
+    }
+    inline void bitSet (uint32_t a, int b) { bit(a, b) = 1; }
+    inline void bitClear (uint32_t a, int b) { bit(a, b) = 0; }
 };
 
 // interrupt vector table in ram
@@ -37,7 +39,7 @@ struct VTable {
 // systick and delays
 
 constexpr static int defaultHz = 4000000;
-extern void enableSysTick (uint32_t divider =defaultHz/1000);
+extern void enableSysTick (uint32_t divider =defaultHz/1000) __attribute__((weak));
 
 // gpio
 

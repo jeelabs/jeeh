@@ -47,13 +47,13 @@ struct VTable {
         can2_sce, otg_fs, dma2_stream5, dma2_stream6, dma2_stream7, usart6,
         i2c3_ev, i2c3_er, otg_hs_ep1_out, otg_hs_ep1_in, otg_hs_wkup, otg_hs,
         dcmi, cryp, hash_rng, fpu, uart7, uart8, spi4, spi5, spi6, sai1,
-        lcd_tft, lcd_tft_err, dma2d;
+        uart9, uart10, dma2d, dummy_x01AC, quadspi; // TODO and a few more ...
 };
 
 // systick and delays
 
 constexpr static int defaultHz = 16000000;
-extern void enableSysTick (uint32_t divider =defaultHz/1000);
+extern void enableSysTick (uint32_t divider =defaultHz/1000) __attribute__((weak));
 
 // gpio
 
