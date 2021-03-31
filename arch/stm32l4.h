@@ -33,7 +33,7 @@ struct VTable {
         dma2_channel1, dma2_channel2, dma2_channel3, dma2_channel4,
         dma2_channel5, dfsdm0, dfsdm1, dfsdm2, comp, lptim1, lptim2, otg_fs,
         dma2_channel6, dma2_channel7, lpuart1, quadspi, i2c3_ev, i2c3_er, sai1,
-        sai2, swpmi1, tsc, lcd, aes, rng, fpu;
+        sai2, swpmi1, tsc, lcd, aes, rng, fpu, crs;
 };
 
 // systick and delays
