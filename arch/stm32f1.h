@@ -18,6 +18,8 @@ namespace Periph {  // [1] p.49-50
     inline volatile uint32_t& bit (uint32_t a, int b) {
         return MMIO32(0x42000000 + ((a & 0xFFFFF) << 5) + (b << 2));
     }
+    inline void bitSet (uint32_t a, int b) { bit(a, b) = 1; }
+    inline void bitClear (uint32_t a, int b) { bit(a, b) = 0; }
 }
 
 // interrupt vector table in ram
