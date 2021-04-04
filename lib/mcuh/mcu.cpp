@@ -138,7 +138,7 @@ namespace mcu {
         ++ticks;
     }
 
-    void msWait (uint32_t ms) {
+    void msWait (uint16_t ms) {
         auto hz = SystemCoreClock;
         SCB(0x14) = ms*(hz/1000)-1; // reload
         SCB(0x18) = 0;              // current
@@ -147,6 +147,10 @@ namespace mcu {
         auto t = ticks;
         while (t == ticks)
             asm ("wfi");
+    }
+
+    auto millis () {
+        return ticks;
     }
 
     extern "C" void irqDispatch () {

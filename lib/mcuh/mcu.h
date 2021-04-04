@@ -35,13 +35,14 @@ namespace mcu {
             }
         };
         auto operator[] (int b) -> IOBit {
-            return {(uint32_t) (&addr + (b>>5)), b&0x1FU};
+            return {(uint32_t) (&addr + (b >> 5)), b & 0x1FU};
         }
 #else
         // bit-banding, only works for specific RAM and periperhal areas
         auto operator[] (int b) -> uint32_t volatile& {
-            return *(uint32_t volatile*) (0x4200'0000 +
-                        ((((uint32_t) &addr & 0xF'FFFF) << 5) + (b << 2)));
+            auto a = (uint32_t) &addr;
+            return *(uint32_t volatile*)
+                ((a & 0xF000'0000) + 0x0200'0000 + (a << 5) + (b << 2));
         }
 #endif
         
@@ -119,15 +120,9 @@ namespace mcu {
 #endif
 
         auto isValid () const -> bool { return _port < 16 && _pin < 16; }
-        auto gpio32 (int off) const -> IOWord { return GPIO(0x400*_port+off); }
-        void mode (int mval, int alt =0) const;
 
-        auto read () const -> int { return (gpio32(IDR) >> _pin) & 1; }
-
-        void write (int v) const {
-            auto mask = 1 << _pin;
-            gpio32(BSRR) = v ? mask : mask << 16;
-        }
+        auto read () const -> int { return gpio32(IDR)[_pin]; }
+        void write (int v) const { gpio32(BSRR) = (v ? 1 : 1<<16)<<_pin; }
 
         // shorthand
         void toggle () const { write(read() ^ 1); }
@@ -148,6 +143,9 @@ namespace mcu {
 
         // define multiple pins, returns ptr to error or nullptr
         static auto define (char const* d, Pin* v, int n) -> char const*;
+    private:
+        auto gpio32 (int off) const -> IOWord { return GPIO(0x400*_port+off); }
+        void mode (int mval, int alt =0) const;
     };
 
     struct Device {
@@ -162,13 +160,9 @@ namespace mcu {
         static Device* devMap [20]; // large enough to handle all device objects
     };
 
-    void msWait (uint32_t ms);
-
-    inline auto millis () {
-        extern uint32_t volatile ticks;
-        return ticks;
-    }
-
+    auto micros ();
+    auto millis ();
+    void msWait (uint16_t ms);
     auto systemClock ();
     auto fastClock (bool pll =true) -> uint32_t;
     void powerDown (bool standby =true);

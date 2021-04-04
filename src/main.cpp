@@ -19,8 +19,6 @@ int main () {
 #if JEEH
     console.init();
     printf("hello\n");
-#else
-    //enableSysTick();
 #endif
 
     mcu::Pin led;
