@@ -12,8 +12,13 @@ extern "C" int printf (char const*, ...);
 #endif
 
 namespace mcu {
+    uint8_t Device::irqMap [];
+    Device* Device::devMap [];
+    uint32_t volatile ticks;
+
+    void Pin::mode (int mval, int alt) const {
 #if STM32F1
-    void Pin::mode (int mval, int /*ignored*/) const {
+        (void) alt;
         RCC(0x18) |= (1<<_port) | (1<<0); // enable GPIOx and AFIO clocks
         // FIXME wrong, mode bits have changed ...
         if (mval == 0b1000 || mval == 0b1100) {
@@ -21,9 +26,7 @@ namespace mcu {
             mval = 0b1000;
         }
         gpio32(0x00).mask(4*_pin, 4) = mval; // CRL/CRH
-    }
 #else
-    void Pin::mode (int mval, int alt) const {
         // enable GPIOx clock
 #if STM32F3
         RCC(0x14)[_port] = 1;
@@ -46,8 +49,8 @@ namespace mcu {
         gpio32(0x08).mask(2*_pin, 2) = mval >> 3; // OSPEEDR
         gpio32(0x0C).mask(2*_pin, 2) = mval >> 5; // PUPDR
         gpio32(0x20).mask(4*_pin, 4) = alt;       // AFRL/AFRH
+#endif // STM32F1
     }
-#endif
 
     auto Pin::mode (char const* desc) const -> bool {
         int m = 0, a = 0;
@@ -110,9 +113,6 @@ namespace mcu {
         while (true) {}
     }
 
-    uint8_t Device::irqMap [];
-    Device* Device::devMap [];
-
     void Device::installIrq (int irq) {
         //assert(16U+irq < sizeof irqMap);
         for (auto& e : devMap) {
@@ -131,8 +131,6 @@ namespace mcu {
     auto systemClock () {
         return SystemCoreClock;
     }
-
-    uint32_t volatile ticks;
 
     extern "C" void SysTick_Handler () {
         ++ticks;
