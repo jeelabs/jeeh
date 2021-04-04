@@ -113,15 +113,14 @@ namespace mcu {
         while (true) {}
     }
 
-    void Device::installIrq (int irq) {
-        //assert(16U+irq < sizeof irqMap);
+    void Device::installIrq (uint32_t irq) {
+        //assert(irq < sizeof irqMap);
         for (auto& e : devMap) {
             if (e == nullptr)
                 e = this;
             if (e == this) {
-                irqMap[16+irq] = &e - devMap;
-                if (irq >= 0)
-                    NVIC(4*(irq>>5)) = (1<<(irq&0x1F));
+                irqMap[irq] = &e - devMap;
+                NVIC(4*(irq>>5)) = 1 << (irq&0x1F);
                 return;
             }
         }
@@ -153,7 +152,7 @@ namespace mcu {
 
     extern "C" void irqDispatch () {
         uint8_t idx = SCB(0xD04); // ICSR
-        Device::devMap[idx]->irqHandler();
+        Device::devMap[idx-16]->irqHandler();
     }
 }
 

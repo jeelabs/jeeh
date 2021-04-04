@@ -1,10 +1,13 @@
 struct Uart : Device {
+    constexpr static auto AHB1ENR = 0x48;
+    constexpr static auto APB1ENR = 0x58;
+
     Uart (int n) : dev (findDev(uartInfo, n)) { if (dev.num != n) dev.num = 0; }
     ~Uart () override { deinit(); }
 
     void init () {
-        Periph::bitSet(RCC_APB1ENR, dev.ena);   // uart on
-        Periph::bitSet(RCC_AHB1ENR, dev.rxDma); // dma on
+        RCC(APB1ENR)[dev.ena] = 1;   // uart on
+        RCC(AHB1ENR)[dev.rxDma] = 1; // dma on
 
         auto rxSh = 4*(dev.rxStream-1), txSh = 4*(dev.txStream-1);
         dmaReg(CSELR) = (dmaReg(CSELR) & ~(0xF<<rxSh) & ~(0xF<<txSh)) |
@@ -28,8 +31,8 @@ struct Uart : Device {
 
     void deinit () {
         if (dev.num > 0) {
-            Periph::bitClear(RCC_APB1ENR, dev.ena);   // uart off
-            Periph::bitClear(RCC_AHB1ENR, dev.rxDma); // dma off
+            RCC(APB1ENR)[dev.ena] = 0;   // uart off
+            RCC(AHB1ENR)[dev.rxDma] = 0; // dma off
         }
     }
 
@@ -38,7 +41,7 @@ struct Uart : Device {
         if (devReg(SR) & (1<<4)) { // is this an rx-idle interrupt?
             auto fill = rxFill();
             if (fill >= 2 && rxBuf[fill-1] == 0x03 && rxBuf[fill-2] == 0x03)
-                reset(); // two CTRL-C's in a row *and* idling: reset!
+                systemReset(); // two CTRL-C's in a row *and* idling: reset!
         }
 
         devReg(CR) = 0b0001'1111; // clear idle and error flags
@@ -74,10 +77,10 @@ struct Uart : Device {
     uint8_t rxBuf [100];
 private:
     auto devReg (int off) const -> volatile uint32_t& {
-        return MMIO32(dev.base+off);
+        return io32<0>(dev.base+off).addr; // TODO yuck
     }
     auto dmaReg (int off) const -> volatile uint32_t& {
-        return MMIO32(dmaInfo[dev.rxDma].base+off);
+        return io32<0>(dmaInfo[dev.rxDma].base+off).addr; // TODO yuck
     }
     auto dmaRX (int off) const -> volatile uint32_t& {
         return dmaReg(off+0x14*(dev.rxStream-1));

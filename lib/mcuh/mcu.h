@@ -97,7 +97,7 @@ namespace mcu {
         return *(uint8_t volatile*) (A+off);
     }
 
-#include "hw-map.h"
+    #include "hw-map.h"
 
     struct Pin {
         uint8_t _port =0xFF, _pin =0xFF;
@@ -145,9 +145,13 @@ namespace mcu {
         virtual void trigger () {}
 
         // install the uart IRQ dispatch handler in the hardware IRQ vector
-        void installIrq (int irq);
+        void installIrq (uint32_t irq);
 
         static uint8_t irqMap [100]; // TODO wrong size ...
         static Device* devMap [20]; // large enough to handle all device objects
     };
+
+    using namespace device;
+    using namespace altpins;
+    #include "uart-l4.h"
 }
