@@ -1,7 +1,13 @@
+#define JEEH 0
+
+#if JEEH
+#include <jee.h>
+#endif
+
 #include <mcu.h>
 
-#if 0
-UartBufDev< PinA<2>, PinA<15>, 100 > console;
+#if JEEH
+UartDev< PinA<2>, PinA<15> > console;
 
 int printf(char const* fmt, ...) {
     va_list ap; va_start(ap, fmt); veprintf(console.putc, fmt, ap); va_end(ap);
@@ -10,10 +16,8 @@ int printf(char const* fmt, ...) {
 #endif
 
 int main () {
-#if 0
+#if JEEH
     console.init();
-    console.baud(921600, fullSpeedClock());
-    wait_ms(500);
     printf("hello\n");
 #else
     //enableSysTick();
@@ -24,9 +28,9 @@ int main () {
 
     while (true) {
         led = 1;
-        //wait_ms(100);
+        mcu::msWait(100);
         led = 0;
-        //wait_ms(400);
+        mcu::msWait(400);
     }
 
     mcu::powerDown();

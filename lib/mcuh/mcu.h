@@ -1,5 +1,4 @@
 #include <cstdint>
-#include <jee.h>
 
 namespace mcu {
     enum ARM_Family { STM_F4, STM_L0, STM_L4 };
@@ -39,7 +38,7 @@ namespace mcu {
             return {(uint32_t) (&addr + (b>>5)), b&0x1FU};
         }
 #else
-        // bit-banding, only for specific RAM and periperhal areas
+        // bit-banding, only works for specific RAM and periperhal areas
         auto operator[] (int b) -> uint32_t volatile& {
             return *(uint32_t volatile*) (0x4200'0000 +
                         ((((uint32_t) &addr & 0xF'FFFF) << 5) + (b << 2)));
@@ -106,9 +105,8 @@ namespace mcu {
     constexpr auto GPIO    = io32<0x4800'0000>;
 #endif
     constexpr auto DWT     = io32<0xE000'1000>;
-    constexpr auto SYSTICK = io32<0xE00E'0010>;
-    constexpr auto NVIC    = io32<0xE00E'0100>;
-    constexpr auto SCB     = io32<0xE00E'D000>;
+    constexpr auto SCB     = io32<0xE000'E000>;
+    constexpr auto NVIC    = io32<0xE00E'E100>;
 
     struct Pin {
         uint8_t _port =0xFF, _pin =0xFF;
@@ -152,13 +150,27 @@ namespace mcu {
         static auto define (char const* d, Pin* v, int n) -> char const*;
     };
 
-    inline auto systemClock () {
-        extern uint32_t SystemCoreClock; // from CMSIS
-        return SystemCoreClock;
+    struct Device {
+        virtual ~Device () =default;
+
+        virtual void irqHandler () =0;
+
+        // install the uart IRQ dispatch handler in the hardware IRQ vector
+        void installIrq (int irq);
+
+        static uint8_t irqMap [100]; // TODO wrong size ...
+        static Device* devMap [20]; // large enough to handle all device objects
+    };
+
+    void msWait (uint32_t ms);
+
+    inline auto millis () {
+        extern uint32_t volatile ticks;
+        return ticks;
     }
 
+    auto systemClock ();
     auto fastClock (bool pll =true) -> uint32_t;
-    auto millis () -> uint32_t;
     void powerDown (bool standby =true);
     [[noreturn]] void systemReset ();
 }

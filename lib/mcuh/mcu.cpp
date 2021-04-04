@@ -1,9 +1,17 @@
 #include "mcu.h"
+#include <cassert>
 #include <cstring>
 
-namespace mcu {
-    extern "C" void SystemCoreClockUpdate (); // from CMSIS
+// from CMSIS
+extern uint32_t SystemCoreClock;
+extern "C" void SystemCoreClockUpdate ();
 
+// TODO kept in here for debugging
+#if JEEH
+extern "C" int printf (char const*, ...);
+#endif
+
+namespace mcu {
 #if STM32F1
     void Pin::mode (int mval, int /*ignored*/) const {
         RCC(0x18) |= (1<<_port) | (1<<0); // enable GPIOx and AFIO clocks
@@ -93,12 +101,63 @@ namespace mcu {
                 PWR(0x18) = 0b1'1111; // clear CWUFx
                 break;
         }
-        SCB(0x10)[2] = 1; // set SLEEPDEEP
+        SCB(0xD10)[2] = 1; // set SLEEPDEEP
         asm ("wfe");
     }
 
     void systemReset () {
-        SCB(0x0C) = (0x5FA<<16) | (1<<2); // SCB AIRCR reset
+        SCB(0xD0C) = (0x5FA<<16) | (1<<2); // SCB AIRCR reset
         while (true) {}
     }
+
+    uint8_t Device::irqMap [];
+    Device* Device::devMap [];
+
+    void Device::installIrq (int irq) {
+        //assert(16U+irq < sizeof irqMap);
+        for (auto& e : devMap) {
+            if (e == nullptr)
+                e = this;
+            if (e == this) {
+                irqMap[16+irq] = &e - devMap;
+                if (irq >= 0)
+                    NVIC(4*(irq>>5)) = (1<<(irq&0x1F));
+                return;
+            }
+        }
+        //assert(false); // ran out of unused device slots
+    }
+
+    auto systemClock () {
+        return SystemCoreClock;
+    }
+
+    uint32_t volatile ticks;
+
+    extern "C" void SysTick_Handler () {
+        ++ticks;
+    }
+
+    void msWait (uint32_t ms) {
+        auto hz = SystemCoreClock;
+        SCB(0x14) = ms*(hz/1000)-1; // reload
+        SCB(0x18) = 0;              // current
+        SCB(0x10) = 0b111;          // control & status
+
+        auto t = ticks;
+        while (t == ticks)
+            asm ("wfi");
+    }
+
+    extern "C" void irqDispatch () {
+        uint8_t idx = SCB(0xD04); // ICSR
+        Device::devMap[idx]->irqHandler();
+    }
+}
+
+// to re-generate "irqs.h", see the "all-irqs.sh" script
+
+#define IRQ(f) void f () __attribute__ ((alias ("irqDispatch")));
+extern "C" {
+#include "irqs.h"
 }
