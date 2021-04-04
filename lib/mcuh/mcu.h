@@ -8,6 +8,11 @@ namespace altpins {
 #include "altpins.h"
 }
 
+// TODO kept in here for debugging
+#if JEEH
+extern "C" int printf (char const*, ...);
+#endif
+
 namespace mcu {
     enum ARM_Family { STM_F4, STM_L0, STM_L4 };
 #if STM32F4
@@ -18,10 +23,10 @@ namespace mcu {
     constexpr auto FAMILY = STM_L4;
 #endif
 
-    auto micros ();
-    auto millis ();
+    auto micros () -> uint32_t;
+    auto millis () -> uint32_t;
     void msWait (uint16_t ms);
-    auto systemClock ();
+    auto systemClock () -> uint32_t;
     auto fastClock (bool pll =true) -> uint32_t;
     void powerDown (bool standby =true);
     [[noreturn]] void systemReset ();
@@ -29,33 +34,25 @@ namespace mcu {
     struct IOWord {
         uint32_t volatile& addr;
 
-        constexpr IOWord (uint32_t volatile& a) : addr (a) {}
-
         operator uint32_t () const { return addr; }
-
         void operator= (uint32_t v) const { addr = v; }
 
 #if STM32L0
-        // simulated bit-banding, not atomic
+        // simulated bit-banding, works with any address, but not atomic
         struct IOBit {
             uint32_t volatile& addr;
             uint8_t bit;
 
-            constexpr IOBit (uint32_t a, uint32_t b)
-                : addr (*(uint32_t volatile*) a), bit (b) {}
-
             operator uint32_t () const { return (addr >> bit) & 1; }
-
             void operator= (uint32_t v) const {
                 if (v) addr |= (1<<bit); else addr &= ~(1<<bit);
             }
         };
-        auto operator[] (int b) -> IOBit {
-            return {(uint32_t) (&addr + (b >> 5)), b & 0x1FU};
-        }
+
+        auto operator[] (int b) { return IOBit {(&addr)[b>>5], b & 0x1FU}; }
 #else
-        // bit-banding, only works for specific RAM and periperhal areas
-        auto operator[] (int b) -> uint32_t volatile& {
+        // use bit-banding, only works for specific RAM and periperhal areas
+        auto& operator[] (int b) {
             auto a = (uint32_t) &addr;
             return *(uint32_t volatile*)
                 ((a & 0xF000'0000) + 0x0200'0000 + (a << 5) + (b << 2));
@@ -65,9 +62,6 @@ namespace mcu {
         struct IOMask {
             uint32_t volatile& addr;
             uint8_t bit, width;
-
-            constexpr IOMask (uint32_t a, uint32_t b, uint32_t w)
-                : addr (*(uint32_t volatile*) a), bit (b), width (w) {}
 
             operator uint32_t () const {
                 auto mask = (1<<width)-1;
@@ -79,21 +73,22 @@ namespace mcu {
                 addr = (addr & ~(mask<<bit)) | ((v & mask)<<bit);
             }
         };
-        auto mask (int b, uint8_t w) -> IOMask {
-            return {(uint32_t) (&addr + (b>>5)), b&0x1FU, w};
+
+        auto mask (int b, uint8_t w) {
+            return IOMask {(&addr)[b>>5], (uint8_t) (b & 0x1FU), w};
         }
     };
 
     template <uint32_t A>
-    auto io32 (int off =0) -> IOWord {
-        return *(uint32_t volatile*) (A+off);
+    auto io32 (int off =0) {
+        return IOWord {*(uint32_t volatile*) (A+off)};
     }
     template <uint32_t A>
-    auto io16 (int off =0) -> uint16_t volatile& {
+    auto& io16 (int off =0) {
         return *(uint16_t volatile*) (A+off);
     }
     template <uint32_t A>
-    auto io8 (int off =0) -> uint8_t volatile& {
+    auto& io8 (int off =0) {
         return *(uint8_t volatile*) (A+off);
     }
 
@@ -109,9 +104,9 @@ namespace mcu {
                 ODR=0x14, BSRR=0x18, AFRL=0x20, AFRH=0x24, BRR=0x28 };
 #endif
 
-        auto isValid () const -> bool { return _port < 16 && _pin < 16; }
+        auto isValid () const { return _port < 16 && _pin < 16; }
 
-        auto read () const -> int { return gpio32(IDR)[_pin]; }
+        auto read () const { return (gpio32(IDR)>>_pin) & 1; }
         void write (int v) const { gpio32(BSRR) = (v ? 1 : 1<<16)<<_pin; }
 
         // shorthand
@@ -139,9 +134,12 @@ namespace mcu {
     };
 
     struct Device {
-        virtual ~Device () =default;
+        uint8_t _id;
 
-        virtual void irqHandler () =0;
+        Device ();
+        ~Device ();
+
+        virtual void irqHandler () =0; // called at interrupt-time
         virtual void trigger () {}
 
         // install the uart IRQ dispatch handler in the hardware IRQ vector

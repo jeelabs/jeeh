@@ -3,7 +3,7 @@ struct Uart : Device {
     constexpr static auto APB1ENR = 0x58;
 
     Uart (int n) : dev (findDev(uartInfo, n)) { if (dev.num != n) dev.num = 0; }
-    ~Uart () override { deinit(); }
+    ~Uart () { deinit(); }
 
     void init () {
         RCC(APB1ENR)[dev.ena] = 1;   // uart on
@@ -36,6 +36,37 @@ struct Uart : Device {
         }
     }
 
+    void baud (uint32_t bd, uint32_t hz) const { devReg(BRR) = (hz+bd/2)/bd; }
+    auto rxFill () { return sizeof rxBuf - dmaRX(CNDTR); }
+    auto txBusy () { return dmaTX(CNDTR) != 0; }
+
+    void txStart (void const* ptr, uint16_t len) {
+        if (len > 0) {
+            dmaTX(CCR)[0] = 0; // ~EN
+            dmaTX(CNDTR) = len;
+            dmaTX(CMAR) = (uint32_t) ptr;
+            dmaTX(CCR)[0] = 1; // EN
+        }
+    }
+
+    DevInfo dev;
+//  void const* txNext;
+//  volatile uint16_t txFill = 0;
+    uint8_t rxBuf [100];
+private:
+    auto devReg (int off) const -> IOWord {
+        return io32<0>(dev.base+off);
+    }
+    auto dmaReg (int off) const -> IOWord {
+        return io32<0>(dmaInfo[dev.rxDma].base+off);
+    }
+    auto dmaRX (int off) const -> IOWord {
+        return dmaReg(off+0x14*(dev.rxStream-1));
+    }
+    auto dmaTX (int off) const -> IOWord {
+        return dmaReg(off+0x14*(dev.txStream-1));
+    }
+
     // the actual interrupt handler, with access to the uart object
     void irqHandler () {
         if (devReg(SR) & (1<<4)) { // is this an rx-idle interrupt?
@@ -56,37 +87,6 @@ struct Uart : Device {
         }
 */
         trigger();
-    }
-
-    void baud (uint32_t bd, uint32_t hz) const { devReg(BRR) = (hz+bd/2)/bd; }
-    auto rxFill () const -> uint16_t { return sizeof rxBuf - dmaRX(CNDTR); }
-    auto txBusy () const -> bool { return dmaTX(CNDTR) != 0; }
-
-    void txStart (void const* ptr, uint16_t len) {
-        if (len > 0) {
-            dmaTX(CCR) &= ~1; // ~EN
-            dmaTX(CNDTR) = len;
-            dmaTX(CMAR) = (uint32_t) ptr;
-            dmaTX(CCR) |= 1; // EN
-        }
-    }
-
-    DevInfo dev;
-//  void const* txNext;
-//  volatile uint16_t txFill = 0;
-    uint8_t rxBuf [100];
-private:
-    auto devReg (int off) const -> volatile uint32_t& {
-        return io32<0>(dev.base+off).addr; // TODO yuck
-    }
-    auto dmaReg (int off) const -> volatile uint32_t& {
-        return io32<0>(dmaInfo[dev.rxDma].base+off).addr; // TODO yuck
-    }
-    auto dmaRX (int off) const -> volatile uint32_t& {
-        return dmaReg(off+0x14*(dev.rxStream-1));
-    }
-    auto dmaTX (int off) const -> volatile uint32_t& {
-        return dmaReg(off+0x14*(dev.txStream-1));
     }
 
     enum { CR1=0x00,CR3=0x08,BRR=0x0C,SR=0x1C,CR=0x20,RDR=0x24,TDR=0x28 };

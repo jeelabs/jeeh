@@ -6,11 +6,6 @@
 extern uint32_t SystemCoreClock;
 extern "C" void SystemCoreClockUpdate ();
 
-// TODO kept in here for debugging
-#if JEEH
-extern "C" int printf (char const*, ...);
-#endif
-
 namespace mcu {
     uint8_t Device::irqMap [];
     Device* Device::devMap [];
@@ -20,7 +15,7 @@ namespace mcu {
 #if STM32F1
         (void) alt;
         RCC(0x18) |= (1<<_port) | (1<<0); // enable GPIOx and AFIO clocks
-        // FIXME wrong, mode bits have changed ...
+        x // FIXME wrong, mode bits have changed ...
         if (mval == 0b1000 || mval == 0b1100) {
             gpio32(ODR)[_pin] = mval & 0b0100;
             mval = 0b1000;
@@ -70,7 +65,7 @@ namespace mcu {
                 case 'V': m |= 0b00'10'0'00; break; // s=11 very high speed
 
                 default:  if (*s < '0' || *s > '9' || a > 1) return false;
-                          m = (m & ~0b00) | 0b10;   // m=10 alt mode
+                          m = (m & ~0b11) | 0b10;   // m=10 alt mode
                           a = 10 * a + *s - '0';
                 case ',': break; // valid as terminator
             }
@@ -113,21 +108,28 @@ namespace mcu {
         while (true) {}
     }
 
-    void Device::installIrq (uint32_t irq) {
-        //assert(irq < sizeof irqMap);
-        for (auto& e : devMap) {
-            if (e == nullptr)
+    Device::Device () {
+        for (auto& e : devMap)
+            if (e == nullptr) {
                 e = this;
-            if (e == this) {
-                irqMap[irq] = &e - devMap;
-                NVIC(4*(irq>>5)) = 1 << (irq&0x1F);
+                _id = &e - devMap;
                 return;
             }
-        }
         //assert(false); // ran out of unused device slots
     }
 
-    auto systemClock () {
+    Device::~Device () {
+        devMap[_id] = nullptr;
+        // TODO clear irqMap entries and NVIC enables
+    }
+
+    void Device::installIrq (uint32_t irq) {
+        //assert(irq < sizeof irqMap);
+        irqMap[irq] = _id;
+        NVIC(4*(irq>>5)) = 1 << (irq&0x1F); // not in bit-band region
+    }
+
+    auto systemClock () -> uint32_t {
         return SystemCoreClock;
     }
 
@@ -146,13 +148,32 @@ namespace mcu {
             asm ("wfi");
     }
 
-    auto millis () {
+    auto millis () -> uint32_t {
         return ticks;
+    }
+
+#if STM32L4
+    static void enableClkAt80MHz () { // using internal 16 MHz HSI
+        FLASH(0x00) = 0x704;                    // flash ACR, 4 wait states
+        RCC(0x00)[8] = 1;                       // HSION
+        while (RCC(0x00)[10] == 0) {}           // wait for HSIRDY
+        RCC(0x0C) = (1<<24) | (10<<8) | (2<<0); // 160 MHz w/ HSI
+        RCC(0x00)[24] = 1;                      // PLLON
+        while (RCC(0x00)[25] == 0) {}           // wait for PLLRDY
+            RCC(0x08) = (3<<0);                 // PLL as SYSCLK, 80 MHz
+    }
+#endif
+
+    auto fastClock (bool pll) -> uint32_t {
+        (void) pll; // TODO ignore, always use PLL
+        enableClkAt80MHz();
+        SystemCoreClockUpdate();
+        return SystemCoreClock;
     }
 
     extern "C" void irqDispatch () {
         uint8_t idx = SCB(0xD04); // ICSR
-        Device::devMap[idx-16]->irqHandler();
+        Device::devMap[Device::irqMap[idx-16]]->irqHandler();
     }
 }
 

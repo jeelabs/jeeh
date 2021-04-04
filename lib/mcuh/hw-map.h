@@ -1,3 +1,5 @@
+// included from "mcu.h"
+
 constexpr auto RTC     = io32<0x4000'2800>;
 constexpr auto IWDG    = io32<0x4000'3000>;
 constexpr auto PWR     = io32<0x4000'7000>;
@@ -27,4 +29,4 @@ constexpr auto GPIO    = io32<0x4800'0000>;
 
 constexpr auto DWT     = io32<0xE000'1000>;
 constexpr auto SCB     = io32<0xE000'E000>;
-constexpr auto NVIC    = io32<0xE00E'E100>;
+constexpr auto NVIC    = io32<0xE000'E100>;

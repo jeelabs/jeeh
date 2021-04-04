@@ -1,5 +1,3 @@
-#define JEEH 1
-
 #if JEEH
 #include <jee.h>
 #endif
@@ -30,32 +28,52 @@ int main () {
 
     struct Console : mcu::Uart {
         Console (int n) : Uart (n) {
+            mcu::Pin tx, rx; // TODO use the altpins info
+#if JEEH
+            tx.define("A9:PU7");
+            rx.define("A10:PU7");
+#else
+            tx.define("A2:PU7");
+            rx.define("A15:PU3");
+#endif
             init();
-            baud(115200, F_CPU);
+            baud(115200, mcu::systemClock());
+            leds[4].toggle();
         }
 
         void trigger () override {
-            leds[6].toggle();
+//printf("!");
+            leds[5].toggle();
         }
     };
 
-    mcu::Pin tx, rx; // TODO use the altpins info
 #if JEEH
-    tx.define("A9:PU7");
-    rx.define("A10:PU7");
-    Console console (1);
+    Console serial (1);
 #else
-    tx.define("A2:PU7");
-    rx.define("A15:PU3");
-    Console console (2);
+    mcu::fastClock();
+    Console serial (2);
 #endif
+    for (int i = 0; i < 1000000; ++i) asm ("");
+    leds[5] = 1;
+    serial.txStart("abc", 3);
 
-    leds[6] = 1;
     while (true) {
-        //leds[6] = 1;
-        //mcu::msWait(100);
-        //leds[6] = 0;
-        mcu::msWait(400);
+        leds[6] = 1;
+        mcu::msWait(100);
+        leds[6] = 0;
+        mcu::msWait(200);
+        mcu::msWait(200);
+        serial.txStart("abc", 3);
+#if JEEH
+        auto t = mcu::millis(), t2 = t;
+        printf("%b:", t);
+        while (t != 0) {
+            auto i = __builtin_clz(t); // number of trailing zero bits
+            printf(" %d", i);
+            t ^= 1<<(31-i);
+        }
+        printf(" #%d\n", __builtin_clz(t));
+#endif
     }
 
     //mcu::powerDown();
