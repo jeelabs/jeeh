@@ -1,5 +1,13 @@
 #include <cstdint>
 
+namespace device {
+#include "prelude.h"
+}
+
+namespace altpins {
+#include "altpins.h"
+}
+
 namespace mcu {
     enum ARM_Family { STM_F4, STM_L0, STM_L4 };
 #if STM32F4
@@ -9,6 +17,14 @@ namespace mcu {
 #elif STM32L4
     constexpr auto FAMILY = STM_L4;
 #endif
+
+    auto micros ();
+    auto millis ();
+    void msWait (uint16_t ms);
+    auto systemClock ();
+    auto fastClock (bool pll =true) -> uint32_t;
+    void powerDown (bool standby =true);
+    [[noreturn]] void systemReset ();
 
     struct IOWord {
         uint32_t volatile& addr;
@@ -126,6 +142,7 @@ namespace mcu {
         virtual ~Device () =default;
 
         virtual void irqHandler () =0;
+        virtual void trigger () {}
 
         // install the uart IRQ dispatch handler in the hardware IRQ vector
         void installIrq (int irq);
@@ -133,12 +150,4 @@ namespace mcu {
         static uint8_t irqMap [100]; // TODO wrong size ...
         static Device* devMap [20]; // large enough to handle all device objects
     };
-
-    auto micros ();
-    auto millis ();
-    void msWait (uint16_t ms);
-    auto systemClock ();
-    auto fastClock (bool pll =true) -> uint32_t;
-    void powerDown (bool standby =true);
-    [[noreturn]] void systemReset ();
 }
