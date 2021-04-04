@@ -28,6 +28,7 @@ namespace mcu {
     void msWait (uint16_t ms);
     auto systemClock () -> uint32_t;
     auto fastClock (bool pll =true) -> uint32_t;
+    auto slowClock (bool low =true) -> uint32_t;
     void powerDown (bool standby =true);
     [[noreturn]] void systemReset ();
 

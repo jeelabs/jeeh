@@ -52,8 +52,9 @@ int main () {
 #else
     mcu::fastClock();
     Console serial (2);
+    if (mcu::systemClock() < 4000000)
+        serial.baud(4800, mcu::systemClock());
 #endif
-    for (int i = 0; i < 1000000; ++i) asm ("");
     leds[5] = 1;
     serial.txStart("abc", 3);
 
