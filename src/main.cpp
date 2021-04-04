@@ -17,7 +17,7 @@ int printf(char const* fmt, ...) {
 
 #endif
 
-mcu::Pin led;
+mcu::Pin leds [7];
 
 int main () {
 #if JEEH
@@ -26,7 +26,7 @@ int main () {
     printf("hello\n");
 #endif
 
-    led.define("B3:P");
+    mcu::Pin::define("A6:P,A5:P,A4:P,A3:P,A1:P,A0:P,B3:P", leds, 7);
 
     struct Console : mcu::Uart {
         Console (int n) : Uart (n) {
@@ -35,7 +35,7 @@ int main () {
         }
 
         void trigger () override {
-            led.toggle();
+            leds[6].toggle();
         }
     };
 
@@ -50,11 +50,11 @@ int main () {
     Console console (2);
 #endif
 
-    led = 1;
+    leds[6] = 1;
     while (true) {
-        //led = 1;
+        //leds[6] = 1;
         //mcu::msWait(100);
-        //led = 0;
+        //leds[6] = 0;
         mcu::msWait(400);
     }
 
