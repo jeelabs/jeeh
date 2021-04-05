@@ -7,11 +7,49 @@
 #if JEEH
 UartDev< PinA<2>, PinA<15> > console;
 
+#if 0
 int printf(char const* fmt, ...) {
     va_list ap; va_start(ap, fmt); veprintf(console.putc, fmt, ap); va_end(ap);
     return 0;
 }
 #endif
+#endif
+
+#include <cstdarg>
+#include "printer.h"
+
+Printer printer (nullptr, [](void*, uint8_t const* ptr, int len) {
+    while (--len >= 0)
+        console.putc(*ptr++);
+});
+
+extern "C" int printf (const char* fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    int result = printer.veprintf(fmt, ap);
+    va_end(ap);
+
+    return result;
+}
+
+auto snprintf (char* buf, uint32_t len, const char* fmt, ...) {
+    struct Info { char* p; int n; } info {buf, len};
+
+    Printer sprinter (&info, [](void* arg, uint8_t const* ptr, int len) {
+        auto& info = *(struct Info*) arg;
+        while (--len >= 0 && --info.n > 0)
+            *info.p++ = *ptr++;
+    });
+
+    va_list ap;
+    va_start(ap, fmt);
+    int result = sprinter.veprintf(fmt, ap);
+    va_end(ap);
+
+    if (info.n > 0)
+        *info.p = 0;
+    return result;
+}
 
 mcu::Pin leds [7];
 
@@ -33,7 +71,13 @@ int main () {
 #if JEEH
     console.init();
     for (int i = 0; i < 1000000; ++i) asm ("");
-    printf("hello\n");
+    auto n = printf("hello %u\n", sizeof (Printer));
+    printf("%d bytes [%0*d]\n", n, 10, -1234567);
+    char buf [5];
+    n = snprintf(buf, sizeof buf, "<%d>", 123456789);
+    printf("1: %s %d\n", buf, n);
+    n = snprintf(buf, 0, "<%d>", 7654321);
+    printf("2: %s %d\n", buf, n);
 #endif
 
     mcu::Pin::define("A6:P,A5:P,A4:P,A3:P,A1:P,A0:P,B3:P", leds, 7);
