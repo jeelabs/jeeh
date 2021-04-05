@@ -1,6 +1,9 @@
 #include "mcu.h"
 #include <cstring>
 
+#include <cstdarg>
+#include "printer.h"
+
 // from CMSIS
 extern uint32_t SystemCoreClock;
 extern "C" void SystemCoreClockUpdate ();
@@ -18,6 +21,25 @@ namespace mcu {
     uint8_t Device::irqMap [(int) device::IrqVec::limit];
     Device* Device::devMap [20];  // large enough to handle all device objects
     uint32_t volatile ticks;
+
+    auto snprintf (char* buf, uint32_t len, const char* fmt, ...) -> int {
+        struct Info { char* p; int n; } info {buf, (int) len};
+
+        Printer sprinter (&info, [](void* arg, uint8_t const* ptr, int len) {
+            auto& info = *(struct Info*) arg;
+            while (--len >= 0 && --info.n > 0)
+                *info.p++ = *ptr++;
+        });
+
+        va_list ap;
+        va_start(ap, fmt);
+        int result = sprinter.vprintf(fmt, ap);
+        va_end(ap);
+
+        if (info.n > 0)
+            *info.p = 0;
+        return result;
+    }
 
     void Pin::mode (int mval, int alt) const {
 #if STM32F1

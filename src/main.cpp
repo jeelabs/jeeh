@@ -3,6 +3,7 @@
 #endif
 
 #include <mcu.h>
+#include <cstring>
 
 #if JEEH
 UartDev< PinA<2>, PinA<15> > console;
@@ -26,28 +27,9 @@ Printer printer (nullptr, [](void*, uint8_t const* ptr, int len) {
 extern "C" int printf (const char* fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
-    int result = printer.veprintf(fmt, ap);
+    int result = printer.vprintf(fmt, ap);
     va_end(ap);
 
-    return result;
-}
-
-auto snprintf (char* buf, uint32_t len, const char* fmt, ...) {
-    struct Info { char* p; int n; } info {buf, len};
-
-    Printer sprinter (&info, [](void* arg, uint8_t const* ptr, int len) {
-        auto& info = *(struct Info*) arg;
-        while (--len >= 0 && --info.n > 0)
-            *info.p++ = *ptr++;
-    });
-
-    va_list ap;
-    va_start(ap, fmt);
-    int result = sprinter.veprintf(fmt, ap);
-    va_end(ap);
-
-    if (info.n > 0)
-        *info.p = 0;
     return result;
 }
 
@@ -67,24 +49,10 @@ void mcu::failAt (void* pc, void const* lr) {
     while (true) {}
 }
 
-int main () {
-#if JEEH
-    console.init();
-    for (int i = 0; i < 1000000; ++i) asm ("");
-    auto n = printf("hello %u\n", sizeof (Printer));
-    printf("%d bytes [%0*d]\n", n, 10, -1234567);
-    char buf [5];
-    n = snprintf(buf, sizeof buf, "<%d>", 123456789);
-    printf("1: %s %d\n", buf, n);
-    n = snprintf(buf, 0, "<%d>", 7654321);
-    printf("2: %s %d\n", buf, n);
-#endif
-
-    mcu::Pin::define("A6:P,A5:P,A4:P,A3:P,A1:P,A0:P,B3:P", leds, 7);
-
-    struct Console : mcu::Uart {
-        Console (int n) : Uart (n) {
-            mcu::Pin tx, rx; // TODO use the altpins info
+namespace mcu {
+    struct Serial : Uart {
+        Serial (int n) : Uart (n) {
+            Pin tx, rx; // TODO use the altpins info
 #if JEEH
             tx.define("A9:PU7");
             rx.define("A10:PU7");
@@ -93,20 +61,77 @@ int main () {
             rx.define("A15:PU3");
 #endif
             init();
-            baud(115200, mcu::systemClock());
-            leds[4].toggle();
+            baud(115200, systemClock());
         }
 
         void trigger () override {
             leds[5].toggle();
         }
+
+        void yield () {
+            leds[1] = 0;
+            asm ("wfi"); // TODO
+            leds[1] = 1;
+        }
+
+        struct Chunk { uint8_t* buf; uint32_t len; };
+
+        auto recv () -> Chunk {
+            while (true) {
+                auto end = rxFill();
+                if (end != rxNext) {
+                    if (end < rxNext)
+                        end = sizeof rxBuf;
+                    ensure(end > rxNext);
+                    return {rxBuf+rxNext, (uint32_t) (end-rxNext)};
+                }
+                yield();
+            }
+        }
+
+        void didRecv (uint32_t n) {
+            rxNext = (rxNext + n) % sizeof rxBuf;
+        }
+
+        auto canSend () -> Chunk {
+            while (txBusy())
+                yield();
+            txNext = 0;
+            return {txBuf, sizeof txBuf}; // TODO no double buffering yet
+        }
+
+        void send (uint32_t n) {
+            txStart(txBuf + txNext, n);
+            txNext = (txNext + n) % sizeof txBuf;
+        }
+
+    private:
+        uint16_t rxNext = 0, txNext = 0;
+        uint8_t txBuf [100];
     };
+}
+
+int main () {
+#if JEEH
+    console.init();
+    for (int i = 0; i < 1000000; ++i) asm ("");
+    auto n = printf("hello %u\n", sizeof (Printer));
+    printf("%d bytes [%0*d]\n", n, 10, -1234567);
+    char buf [5];
+    n = mcu::snprintf(buf, sizeof buf, "<%d>", 123456789);
+    printf("1: %s %d\n", buf, n);
+    n = mcu::snprintf(buf, 0, "<%d>", 7654321);
+    printf("2: %s %d\n", buf, n);
+#endif
+
+    mcu::Pin::define("A6:P,A5:P,A4:P,A3:P,A1:P,A0:P,B3:P", leds, 7);
+
 
 #if JEEH
-    Console serial (1);
+    mcu::Serial serial (1);
 #else
     mcu::fastClock();
-    Console serial (2);
+    mcu::Serial serial (2);
     if (mcu::systemClock() < 4000000)
         serial.baud(4800, mcu::systemClock());
 #endif
@@ -114,12 +139,30 @@ int main () {
     serial.txStart("abc", 3);
 
     while (true) {
+#if 0
         leds[6] = 1;
         mcu::msWait(100);
         leds[6] = 0;
         mcu::msWait(200);
         mcu::msWait(200);
         serial.txStart("abc", 3);
+#else
+        auto [ptr, len] = serial.canSend();
+        auto x = "akjsfh lakjsdhg laksjdfh laksjdfh alksdjgh asldkjfhalsdkj\n";
+        auto n = strlen(x);
+        ensure(n < len);
+        memcpy(ptr, x, n);
+        serial.send(n);
+        //serial.txStart(x, n);
+
+        auto [PTR, LEN] = serial.canSend();
+        auto X = "AKJSFH LAKJSDHG LAKSJDFH LAKSJDFH ALKSDJGH ASLDKJFHALSDK\n";
+        auto N = strlen(X);
+        ensure(N < LEN);
+        memcpy(PTR, X, N);
+        serial.send(N);
+        //serial.txStart(X, N);
+#endif
 #if 0
         auto t = mcu::millis(), t2 = t;
         printf("%b:", t);

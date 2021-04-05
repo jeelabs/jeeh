@@ -38,12 +38,15 @@ namespace mcu {
     constexpr auto FAMILY = STM_L4;
 #endif
 
+    auto snprintf (char*, uint32_t, const char*, ...) -> int;
+
     auto micros () -> uint32_t;
     auto millis () -> uint32_t;
     void msWait (uint16_t ms);
     auto systemClock () -> uint32_t;
     auto fastClock (bool pll =true) -> uint32_t;
     auto slowClock (bool low =true) -> uint32_t;
+
     void powerDown (bool standby =true);
     [[noreturn]] void systemReset ();
     [[noreturn]] void failAt (void*, void const*);

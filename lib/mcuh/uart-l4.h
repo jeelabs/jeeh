@@ -37,21 +37,20 @@ struct Uart : Device {
     }
 
     void baud (uint32_t bd, uint32_t hz) const { devReg(BRR) = (hz+bd/2)/bd; }
-    auto rxFill () { return sizeof rxBuf - dmaRX(CNDTR); }
+    auto rxFill () -> uint16_t { return sizeof rxBuf - dmaRX(CNDTR); }
     auto txBusy () { return dmaTX(CNDTR) != 0; }
 
     void txStart (void const* ptr, uint16_t len) {
-        if (len > 0) {
-            dmaTX(CCR)[0] = 0; // ~EN
-            dmaTX(CNDTR) = len;
-            dmaTX(CMAR) = (uint32_t) ptr;
-            dmaTX(CCR)[0] = 1; // EN
-        }
+        dmaTX(CCR)[0] = 0; // ~EN
+        dmaTX(CNDTR) = len;
+        dmaTX(CMAR) = (uint32_t) ptr;
+        dmaTX(CCR)[0] = 1; // EN
     }
 
     DevInfo dev;
 //  void const* txNext;
 //  volatile uint16_t txFill = 0;
+protected:
     uint8_t rxBuf [100];
 private:
     auto devReg (int off) const -> IOWord {
