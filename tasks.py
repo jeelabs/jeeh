@@ -13,7 +13,7 @@ def disas(c):
 @task
 def symbols(c):
     """show a memory map with symbols"""
-    c.run("arm-none-eabi-nm -gCnS .pio/build/nucleo-l432/firmware.elf |"
+    c.run("arm-none-eabi-nm -CnS .pio/build/nucleo-l432/firmware.elf |"
           "grep -v Handler")
 
 @task
