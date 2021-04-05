@@ -11,11 +11,23 @@ int printf(char const* fmt, ...) {
     va_list ap; va_start(ap, fmt); veprintf(console.putc, fmt, ap); va_end(ap);
     return 0;
 }
-#else
-
 #endif
 
 mcu::Pin leds [7];
+
+void mcu::failAt (void* pc, void const* lr) {
+#if JEEH
+    printf("failAt %p %p\n", pc, lr);
+    for (uint32_t i = 0; i < systemClock() >> 16; ++i) {}
+#else
+    while (true) {
+        leds[0].toggle(); // fast blink
+        for (uint32_t i = 0; i < systemClock() >> 8; ++i) {}
+    }
+#endif
+    mcu::SCB(0xD0C) = (0x5FA<<16) | (1<<2); // SCB AIRCR reset
+    while (true) {}
+}
 
 int main () {
 #if JEEH
@@ -42,7 +54,6 @@ int main () {
         }
 
         void trigger () override {
-//printf("!");
             leds[5].toggle();
         }
     };
@@ -65,7 +76,7 @@ int main () {
         mcu::msWait(200);
         mcu::msWait(200);
         serial.txStart("abc", 3);
-#if JEEH
+#if 0
         auto t = mcu::millis(), t2 = t;
         printf("%b:", t);
         while (t != 0) {

@@ -1,15 +1,11 @@
 #include "mcu.h"
-#include <cassert>
 #include <cstring>
 
 // from CMSIS
 extern uint32_t SystemCoreClock;
 extern "C" void SystemCoreClockUpdate ();
 
-extern "C" void abort () {
-    mcu::SCB(0xD0C) = (0x5FA<<16) | (1<<2); // SCB AIRCR reset
-    while (true) {}
-}
+extern "C" void abort () { ensure(0); }
 
 // this is the recommended way to bail out
 void mcu::systemReset () __attribute__ ((alias ("abort")));
@@ -19,8 +15,8 @@ extern "C" void __cxa_pure_virtual () __attribute__ ((alias ("abort")));
 namespace std { void terminate () __attribute__ ((alias ("abort"))); }
 
 namespace mcu {
-    uint8_t Device::irqMap [];
-    Device* Device::devMap [];
+    uint8_t Device::irqMap [(int) device::IrqVec::limit];
+    Device* Device::devMap [20];  // large enough to handle all device objects
     uint32_t volatile ticks;
 
     void Pin::mode (int mval, int alt) const {
@@ -122,7 +118,7 @@ namespace mcu {
                 _id = &e - devMap;
                 return;
             }
-        //assert(false); // ran out of unused device slots
+        ensure(0); // ran out of unused device slots
     }
 
     Device::~Device () {
@@ -131,7 +127,7 @@ namespace mcu {
     }
 
     void Device::installIrq (uint32_t irq) {
-        //assert(irq < sizeof irqMap);
+        ensure(irq < sizeof irqMap);
         irqMap[irq] = _id;
         NVIC(4*(irq>>5)) = 1 << (irq&0x1F); // not in bit-band region
     }

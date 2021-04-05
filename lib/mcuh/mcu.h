@@ -8,8 +8,23 @@ namespace altpins {
 #include "altpins.h"
 }
 
-// TODO kept in here for debugging
+// see https://interrupt.memfault.com/blog/asserts-in-embedded-systems
+#ifdef NDEBUG
+#define ensure(exp) ((void)0)
+#else
+#define ensure(exp)                                 \
+  do                                                \
+    if (!(exp)) {                                   \
+      void *pc;                                     \
+      asm volatile ("mov %0, pc" : "=r" (pc));      \
+      void const* lr = __builtin_return_address(0); \
+      mcu::failAt(pc, lr);                          \
+    }                                               \
+  while (false)
+#endif
+
 #if JEEH
+// TODO kept in here for debugging
 extern "C" int printf (char const*, ...);
 #endif
 
@@ -31,6 +46,7 @@ namespace mcu {
     auto slowClock (bool low =true) -> uint32_t;
     void powerDown (bool standby =true);
     [[noreturn]] void systemReset ();
+    [[noreturn]] void failAt (void*, void const*);
 
     struct IOWord {
         uint32_t volatile& addr;
@@ -146,8 +162,8 @@ namespace mcu {
         // install the uart IRQ dispatch handler in the hardware IRQ vector
         void installIrq (uint32_t irq);
 
-        static uint8_t irqMap [100]; // TODO wrong size ...
-        static Device* devMap [20]; // large enough to handle all device objects
+        static uint8_t irqMap [];
+        static Device* devMap [];
     };
 
     using namespace device;
