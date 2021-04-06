@@ -161,21 +161,21 @@ namespace mcu {
 
     void idle () __attribute__ ((weak)); // called with interrupts disabled
 
+/*
+    void mainLoop () {
+        while (Stacklet::runLoop()) {
+            BlockIRQ crit;
+            if (Device::pending == 0)
+                idle();
+        }
+    }
+*/
+
     struct Device {
         uint8_t _id;
 
         Device ();
         ~Device ();
-
-#if 0
-        void mainLoop () {
-            while (Stacklet::runLoop()) {
-                BlockIRQ crit;
-                if (pending == 0)
-                    idle();
-            }
-        }
-#endif
 
         template <typename F>
         void waitWhile (F fun) {
@@ -190,8 +190,8 @@ namespace mcu {
             }
         }
 
-        // install the uart IRQ dispatch handler in the hardware IRQ vector
-        void installIrq (uint32_t irq);
+        // install a IRQ dispatch handler in the hardware IRQ vector
+        void irqInstall (uint32_t irq);
 
         virtual void irqHandler () =0;         // called at interrupt time
         void trigger () { pending |= 1<<_id; } // called at interrupt time
@@ -218,5 +218,5 @@ namespace mcu {
 
     using namespace device;
     using namespace altpins;
-    #include "uart-l4.h"
+    #include "uart-stm32l4.h"
 }

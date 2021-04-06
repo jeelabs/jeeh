@@ -119,23 +119,6 @@ namespace mcu {
         return d;
     }
 
-    void powerDown (bool standby) {
-        switch (FAMILY) {
-            case STM_F4:
-                RCC(0x40)[28] = 1; // PWREN
-                PWR(0x00)[1] = standby; // PDDS if standby
-                break;                
-            case STM_L4:
-                RCC(0x58)[28] = 1; // PWREN
-                // set to either shutdown or stop 1 mode
-                PWR(0x00) = (0b01<<9) | (standby ? 0b100 : 0b001);
-                PWR(0x18) = 0b1'1111; // clear CWUFx
-                break;
-        }
-        SCB(0xD10)[2] = 1; // set SLEEPDEEP
-        asm ("wfe");
-    }
-
     Device::Device () {
         for (auto& e : devMap)
             if (e == nullptr) {
@@ -151,7 +134,7 @@ namespace mcu {
         // TODO clear irqMap entries and NVIC enables
     }
 
-    void Device::installIrq (uint32_t irq) {
+    void Device::irqInstall (uint32_t irq) {
         ensure(irq < sizeof irqMap);
         irqMap[irq] = _id;
         nvicEnable(irq);
@@ -220,9 +203,27 @@ namespace mcu {
         return SystemCoreClock = low ? 100000 : 4000000;
     }
 
+    void powerDown (bool standby) {
+        switch (FAMILY) {
+            case STM_F4:
+                RCC(0x40)[28] = 1; // PWREN
+                PWR(0x00)[1] = standby; // PDDS if standby
+                break;
+            case STM_L4:
+                RCC(0x58)[28] = 1; // PWREN
+                // set to either shutdown or stop 1 mode
+                PWR(0x00) = (0b01<<9) | (standby ? 0b100 : 0b001);
+                PWR(0x18) = 0b1'1111; // clear CWUFx
+                break;
+        }
+        SCB(0xD10)[2] = 1; // set SLEEPDEEP
+        asm ("wfe");
+    }
+
     extern "C" void irqDispatch () {
-        uint8_t idx = SCB(0xD04); // ICSR
-        Device::devMap[Device::irqMap[idx-16]]->irqHandler();
+        uint8_t irq = SCB(0xD04); // ICSR
+        auto idx = Device::irqMap[irq-16];
+        Device::devMap[idx]->irqHandler();
     }
 }
 

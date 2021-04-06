@@ -24,9 +24,9 @@ struct Uart : Device {
         dmaReg(CSELR) = (dmaReg(CSELR) & ~(0xF<<rxSh) & ~(0xF<<txSh)) |
                                     (dev.rxChan<<rxSh) | (dev.txChan<<txSh);
 
-        installIrq((uint8_t) dev.irq);
-        installIrq(dmaInfo[dev.rxDma].streams[dev.rxStream]);
-        installIrq(dmaInfo[dev.txDma].streams[dev.txStream]);
+        irqInstall((uint8_t) dev.irq);
+        irqInstall(dmaInfo[dev.rxDma].streams[dev.rxStream]);
+        irqInstall(dmaInfo[dev.txDma].streams[dev.txStream]);
     }
 
     void deinit () {
@@ -115,10 +115,10 @@ struct Uart : Device {
     }
 
     DevInfo dev;
-protected:
+private:
     uint8_t rxBuf [100], txBuf [100];
     uint16_t rxPull =0, txNext =0, txLast =0;
-private:
+
     static auto txWrap (uint16_t n) -> uint16_t {
         return n < sizeof txBuf ? n : n - sizeof txBuf;
     }
