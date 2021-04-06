@@ -105,6 +105,9 @@ int main () {
         memcpy(PTR, X, N);
         serial.send(N);
 #endif
+        auto [rp, rn] = serial.recv();
+        printf("%p %d\n", rp, rn);
+        serial.didRecv(rn);
 #if 0
         auto t = mcu::millis(), t2 = t;
         printf("%b:", t);
