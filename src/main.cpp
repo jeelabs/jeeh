@@ -3,7 +3,6 @@
 #endif
 
 #include <mcu.h>
-#include <cstring>
 
 #if JEEH
 UartDev< PinA<2>, PinA<15> > console;
@@ -55,10 +54,15 @@ void mcu::idle () {
     leds[1] = 1;
 }
 
+extern "C" void SystemCoreClockUpdate ();
+
 int main () {
 #if JEEH
     console.init();
-    for (int i = 0; i < 1000000; ++i) asm ("");
+    enableClkAt80MHz(); // not systick etc
+    SystemCoreClockUpdate();
+    console.baud(115200, 80000000);
+    for (int i = 0; i < 10000000; ++i) asm ("");
     auto n = printf("hello %u\n", sizeof (Printer));
     printf("%d bytes [%0*d]\n", n, 10, -1234567);
     char buf [5];
@@ -83,10 +87,12 @@ int main () {
 #endif
     serial.init();
     auto hz = mcu::systemClock();
-    serial.baud(hz < 4000000 ? 4800 : 115200, hz);
+    serial.baud(hz < 4000000 ? 4800 : 921600, hz);
+    printf("%d Hz\n", hz);
+    for (int i = 0; i < 10000000; ++i) asm ("");
 
     leds[5] = 1;
-    serial.txStart("abc", 3);
+    //serial.txStart("abc\n", 4);
 
     while (true) {
 #if 0
@@ -97,23 +103,13 @@ int main () {
         mcu::msWait(200);
         serial.txStart("abc", 3);
 #else
-        auto [ptr, len] = serial.canSend();
-        auto x = "akjsfh lakjsdhg laksjdfh laksjdfh alksdjgh asldkjfhalsdkj\n";
-        auto n = strlen(x);
-        ensure(n < len);
-        memcpy(ptr, x, n);
-        serial.send(n);
-
-        auto [PTR, LEN] = serial.canSend();
-        auto X = "       LAKJSDHG          LAKSJDFH          ASLDKJFHALSDK\n";
-        auto N = strlen(X);
-        ensure(N < LEN);
-        memcpy(PTR, X, N);
-        serial.send(N);
+        for (auto x = "12345678901234567890123456789012345678901234567890123456789012345678901234567890/\n";
+                *x != 0; ++x)
+            serial.send((uint8_t const*) x, strlen(x));
 #endif
-        auto [rp, rn] = serial.recv();
-        printf("%p %u\n", rp, rn);
-        serial.didRecv(rn);
+        //auto [rp, rn] = serial.recv();
+        //printf("%p %u\n", rp, rn);
+        //serial.didRecv(rn);
 #if 0
         auto t = mcu::millis(), t2 = t;
         printf("%b:", t);

@@ -23,7 +23,7 @@ namespace mcu {
     Device* Device::devMap [20];  // large enough to handle all device objects
     uint32_t volatile ticks;
 
-    void idle () { asm ("wfi"); }
+    void idle () { asm ("wfi"); } // weak idle handler, can be redefined
 
     auto snprintf (char* buf, uint32_t len, const char* fmt, ...) -> int {
         struct Info { char* p; int n; } info {buf, (int) len};

@@ -37,54 +37,89 @@ struct Uart : Device {
     }
 
     void baud (uint32_t bd, uint32_t hz) const { devReg(BRR) = (hz+bd/2)/bd; }
-    auto rxFill () -> uint16_t { return sizeof rxBuf - dmaRX(CNDTR); }
-    auto txBusy () { return dmaTX(CNDTR) != 0; }
+    auto rxNext () -> uint16_t { return sizeof rxBuf - dmaRX(CNDTR); }
+    auto txLeft () -> uint16_t { return dmaTX(CNDTR); }
 
-    void txStart (void const* ptr, uint16_t len) {
+    void txStart (uint16_t len) {
         dmaTX(CCR)[0] = 0; // ~EN
         dmaTX(CNDTR) = len;
-        dmaTX(CMAR) = (uint32_t) ptr;
+        dmaTX(CMAR) = (uint32_t) txBuf + txLast;
+        while (devReg(SR)[7] == 0) {} // wait for TXE
         dmaTX(CCR)[0] = 1; // EN
+        txLast = txWrap(txLast + len);
     }
 
     struct Chunk { uint8_t* buf; uint16_t len; };
 
     auto recv () -> Chunk {
         uint16_t end;
-
         waitWhile([&]() {
-            end = rxFill();
-            return end == rxNext;
+            end = rxNext();
+            return rxPull == end; // true if there's no data
         });
-
-        if (end < rxNext)
+        if (end < rxPull)
             end = sizeof rxBuf;
-        return {rxBuf+rxNext, (uint16_t) (end-rxNext)};
+        return {rxBuf+rxPull, (uint16_t) (end-rxPull)};
     }
 
-    void didRecv (uint32_t n) {
-        rxNext = (rxNext + n) % sizeof rxBuf;
+    void didRecv (uint32_t len) {
+        rxPull = (rxPull + len) % sizeof rxBuf;
     }
 
     auto canSend () -> Chunk {
-        waitWhile([=]() { return txBusy(); });
+        // there are 3 cases (note: #=sending, +=pending, .=free)
+        //
+        // txBuf: [   <-txLeft   txLast   txNext   ]
+        //        [...#################+++++++++...]
+        //
+        // txBuf: [   txLast   txNext   <-txLeft   ]
+        //        [#########+++++++++...###########]
+        //
+        // txBuf: [   txNext   <-txLeft   txLast   ]
+        //        [+++++++++...#################+++]
+        //
+        // txLeft() reads the "CNDTR" DMA register, which counts down to zero
+        // it's relative to txLast, which marks the current transfer limit
+        //
+        // when the DMA is done and txNext != txLast, a new xfer is started
+        // this happens at interrupt time and also adjusts txLast accordingly
+        // if txLast > txNext, two separate transfers need to be started
 
-        txNext = 0;
-        return {txBuf, sizeof txBuf}; // TODO no double buffering yet
+        uint16_t avail;
+        waitWhile([&]() {
+            auto left = txLeft();
+            ensure(left < sizeof txBuf);
+            uint16_t take = txWrap(txNext + sizeof txBuf - left);
+            avail = take > txNext ? take - txNext : sizeof txBuf - txNext;
+            return left != 0 || avail == 0;
+        });
+        ensure(avail > 0);
+        return {txBuf+txNext, avail};
     }
 
-    void send (uint32_t n) {
-        txStart(txBuf + txNext, n);
-        txNext = (txNext + n) % sizeof txBuf;
+    void send (uint8_t const* p, uint32_t n) {
+        while (n > 0) {
+            auto [ptr, len] = canSend();
+            if (len > n)
+                len = n;
+            memcpy(ptr, p, len);
+            txNext = txWrap(txNext + len);
+            if (txLeft() == 0)
+                txStart(len);
+            p += len;
+            n -= len;
+        }
     }
 
     DevInfo dev;
-//  void const* txNext;
-//  volatile uint16_t txFill = 0;
 protected:
     uint8_t rxBuf [100], txBuf [100];
-    uint16_t rxNext = 0, txNext = 0;
+    uint16_t rxPull =0, txNext =0, txLast =0;
 private:
+    static auto txWrap (uint16_t n) -> uint16_t {
+        return n < sizeof txBuf ? n : n - sizeof txBuf;
+    }
+
     auto devReg (int off) const -> IOWord {
         return io32<0>(dev.base+off);
     }
@@ -101,22 +136,22 @@ private:
     // the actual interrupt handler, with access to the uart object
     void irqHandler () {
         if (devReg(SR) & (1<<4)) { // is this an rx-idle interrupt?
-            auto fill = rxFill();
-            if (fill >= 2 && rxBuf[fill-1] == 0x03 && rxBuf[fill-2] == 0x03)
+            auto next = rxNext();
+            if (next >= 2 && rxBuf[next-1] == 0x03 && rxBuf[next-2] == 0x03)
                 systemReset(); // two CTRL-C's in a row *and* idling: reset!
         }
 
         devReg(CR) = 0b0001'1111; // clear idle and error flags
 
         auto rxSh = 4*(dev.rxStream-1), txSh = 4*(dev.txStream-1);
-//      auto stat = dmaReg(ISR);
+        auto stat = dmaReg(ISR);
         dmaReg(IFCR) = (1<<rxSh) | (1<<txSh); // global clear rx and tx dma
-/*
+
         if ((stat & (1<<(1+txSh))) != 0) { // TCIF
-            txStart(txNext, txFill);
-            txFill = 0;
+            auto n = txNext >= txLast ? txNext - txLast : sizeof txBuf - txLast;
+            txStart(n);
         }
-*/
+
         trigger();
     }
 
