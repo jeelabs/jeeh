@@ -107,9 +107,9 @@ int main () {
                 *x != 0; ++x)
             serial.send((uint8_t const*) x, strlen(x));
 #endif
-        //auto [rp, rn] = serial.recv();
-        //printf("%p %u\n", rp, rn);
-        //serial.didRecv(rn);
+        auto [rp, rn] = serial.recv();
+        printf("%p %u\n", rp, rn);
+        serial.didRecv(rn);
 #if 0
         auto t = mcu::millis(), t2 = t;
         printf("%b:", t);

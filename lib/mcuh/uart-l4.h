@@ -40,13 +40,16 @@ struct Uart : Device {
     auto rxNext () -> uint16_t { return sizeof rxBuf - dmaRX(CNDTR); }
     auto txLeft () -> uint16_t { return dmaTX(CNDTR); }
 
-    void txStart (uint16_t len) {
-        dmaTX(CCR)[0] = 0; // ~EN
-        dmaTX(CNDTR) = len;
-        dmaTX(CMAR) = (uint32_t) txBuf + txLast;
-        while (devReg(SR)[7] == 0) {} // wait for TXE
-        dmaTX(CCR)[0] = 1; // EN
-        txLast = txWrap(txLast + len);
+    void txStart () {
+        auto len = txNext >= txLast ? txNext - txLast : sizeof txBuf - txLast;
+        if (len > 0) {
+            dmaTX(CCR)[0] = 0; // ~EN
+            dmaTX(CNDTR) = len;
+            dmaTX(CMAR) = (uint32_t) txBuf + txLast;
+            txLast = txWrap(txLast + len);
+            while (devReg(SR)[7] == 0) {} // wait for TXE
+            dmaTX(CCR)[0] = 1; // EN
+        }
     }
 
     struct Chunk { uint8_t* buf; uint16_t len; };
@@ -105,7 +108,7 @@ struct Uart : Device {
             memcpy(ptr, p, len);
             txNext = txWrap(txNext + len);
             if (txLeft() == 0)
-                txStart(len);
+                txStart();
             p += len;
             n -= len;
         }
@@ -147,10 +150,8 @@ private:
         auto stat = dmaReg(ISR);
         dmaReg(IFCR) = (1<<rxSh) | (1<<txSh); // global clear rx and tx dma
 
-        if ((stat & (1<<(1+txSh))) != 0) { // TCIF
-            auto n = txNext >= txLast ? txNext - txLast : sizeof txBuf - txLast;
-            txStart(n);
-        }
+        if ((stat & (1<<(1+txSh))) != 0) // TCIF
+            txStart();
 
         trigger();
     }
