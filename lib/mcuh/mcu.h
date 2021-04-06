@@ -158,15 +158,7 @@ namespace mcu {
         ~BlockIRQ () { asm ("cpsie i"); }
     };
 
-    template <typename F>
-    void waitWhile (F fun) {
-        while (true) {
-            BlockIRQ crit;
-            if (!fun())
-                return;
-            asm ("wfi");
-        }
-    }
+    void idle () __attribute__ ((weak)); // called with interrupts disabled
 
     struct Device {
         uint8_t _id;
@@ -174,11 +166,34 @@ namespace mcu {
         Device ();
         ~Device ();
 
-        virtual void irqHandler () =0;  // called at interrupt-time
-        virtual void trigger () {}
+#if 0
+        void mainLoop () {
+            while (Stacklet::runLoop()) {
+                BlockIRQ crit;
+                if (pending == 0)
+                    idle();
+            }
+        }
+#endif
+
+        template <typename F>
+        void waitWhile (F fun) {
+            while (true) {
+                BlockIRQ crit;
+                if (!fun())
+                    return;
+                if (pending & (1<<_id)) {
+                    pending ^= 1<<_id;
+                    idle();
+                }
+            }
+        }
 
         // install the uart IRQ dispatch handler in the hardware IRQ vector
         void installIrq (uint32_t irq);
+
+        virtual void irqHandler () =0;         // called at interrupt time
+        void trigger () { pending |= 1<<_id; } // called at interrupt time
 
         static void nvicEnable (uint8_t irq) {
             NVIC(4*(irq>>5)) = 1 << (irq & 0x1F);
@@ -188,6 +203,14 @@ namespace mcu {
             NVIC(0x80+4*(irq>>5)) = 1 << (irq & 0x1F);
         }
 
+        static auto clearPending () {
+            BlockIRQ crit;
+            auto r = pending;
+            pending = 0;
+            return r;
+        }
+
+        static uint32_t pending;
         static uint8_t irqMap [];
         static Device* devMap [];
     };

@@ -49,6 +49,12 @@ void mcu::failAt (void* pc, void const* lr) {
     while (true) {}
 }
 
+void mcu::idle () {
+    leds[1] = 0;
+    asm ("wfi");
+    leds[1] = 1;
+}
+
 int main () {
 #if JEEH
     console.init();
@@ -106,7 +112,7 @@ int main () {
         serial.send(N);
 #endif
         auto [rp, rn] = serial.recv();
-        printf("%p %d\n", rp, rn);
+        printf("%p %u\n", rp, rn);
         serial.didRecv(rn);
 #if 0
         auto t = mcu::millis(), t2 = t;

@@ -18,9 +18,12 @@ extern "C" void __cxa_pure_virtual () __attribute__ ((alias ("abort")));
 namespace std { void terminate () __attribute__ ((alias ("abort"))); }
 
 namespace mcu {
+    uint32_t Device::pending;
     uint8_t Device::irqMap [(int) device::IrqVec::limit];
     Device* Device::devMap [20];  // large enough to handle all device objects
     uint32_t volatile ticks;
+
+    void idle () { asm ("wfi"); }
 
     auto snprintf (char* buf, uint32_t len, const char* fmt, ...) -> int {
         struct Info { char* p; int n; } info {buf, (int) len};
@@ -36,7 +39,7 @@ namespace mcu {
         int result = sprinter.vprintf(fmt, ap);
         va_end(ap);
 
-        if (info.n > 0)
+        if (len > 0)
             *info.p = 0;
         return result;
     }

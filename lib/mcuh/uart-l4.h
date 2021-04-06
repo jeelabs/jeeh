@@ -9,10 +9,6 @@ struct Uart : Device {
         RCC(APB1ENR)[dev.ena] = 1;   // uart on
         RCC(AHB1ENR)[dev.rxDma] = 1; // dma on
 
-        auto rxSh = 4*(dev.rxStream-1), txSh = 4*(dev.txStream-1);
-        dmaReg(CSELR) = (dmaReg(CSELR) & ~(0xF<<rxSh) & ~(0xF<<txSh)) |
-                                    (dev.rxChan<<rxSh) | (dev.txChan<<txSh);
-
         dmaRX(CNDTR) = sizeof rxBuf;
         dmaRX(CPAR) = dev.base + RDR;
         dmaRX(CMAR) = (uint32_t) rxBuf;
@@ -23,6 +19,10 @@ struct Uart : Device {
 
         devReg(CR1) = 0b0001'1101; // IDLEIE, TE, RE, UE
         devReg(CR3) = 0b1100'0000; // DMAT, DMAR
+
+        auto rxSh = 4*(dev.rxStream-1), txSh = 4*(dev.txStream-1);
+        dmaReg(CSELR) = (dmaReg(CSELR) & ~(0xF<<rxSh) & ~(0xF<<txSh)) |
+                                    (dev.rxChan<<rxSh) | (dev.txChan<<txSh);
 
         installIrq((uint8_t) dev.irq);
         installIrq(dmaInfo[dev.rxDma].streams[dev.rxStream]);
@@ -47,7 +47,7 @@ struct Uart : Device {
         dmaTX(CCR)[0] = 1; // EN
     }
 
-    struct Chunk { uint8_t* buf; uint32_t len; };
+    struct Chunk { uint8_t* buf; uint16_t len; };
 
     auto recv () -> Chunk {
         uint16_t end;
@@ -59,7 +59,7 @@ struct Uart : Device {
 
         if (end < rxNext)
             end = sizeof rxBuf;
-        return {rxBuf+rxNext, (uint32_t) (end-rxNext)};
+        return {rxBuf+rxNext, (uint16_t) (end-rxNext)};
     }
 
     void didRecv (uint32_t n) {
