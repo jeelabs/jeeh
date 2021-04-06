@@ -151,7 +151,7 @@ namespace mcu {
     void Device::installIrq (uint32_t irq) {
         ensure(irq < sizeof irqMap);
         irqMap[irq] = _id;
-        NVIC(4*(irq>>5)) = 1 << (irq&0x1F); // not in bit-band region
+        nvicEnable(irq);
     }
 
     auto systemClock () -> uint32_t {

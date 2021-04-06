@@ -153,17 +153,40 @@ namespace mcu {
         void mode (int mval, int alt =0) const;
     };
 
+    struct BlockIRQ {
+        BlockIRQ () { asm ("cpsid i"); }
+        ~BlockIRQ () { asm ("cpsie i"); }
+    };
+
+    template <typename F>
+    void waitWhile (F fun) {
+        while (true) {
+            BlockIRQ crit;
+            if (!fun())
+                return;
+            asm ("wfi");
+        }
+    }
+
     struct Device {
         uint8_t _id;
 
         Device ();
         ~Device ();
 
-        virtual void irqHandler () =0; // called at interrupt-time
+        virtual void irqHandler () =0;  // called at interrupt-time
         virtual void trigger () {}
 
         // install the uart IRQ dispatch handler in the hardware IRQ vector
         void installIrq (uint32_t irq);
+
+        static void nvicEnable (uint8_t irq) {
+            NVIC(4*(irq>>5)) = 1 << (irq & 0x1F);
+        }
+
+        static void nvicDisable (uint8_t irq) {
+            NVIC(0x80+4*(irq>>5)) = 1 << (irq & 0x1F);
+        }
 
         static uint8_t irqMap [];
         static Device* devMap [];

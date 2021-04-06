@@ -49,68 +49,6 @@ void mcu::failAt (void* pc, void const* lr) {
     while (true) {}
 }
 
-namespace mcu {
-    struct Serial : Uart {
-        Serial (int n) : Uart (n) {
-            Pin tx, rx; // TODO use the altpins info
-#if JEEH
-            tx.define("A9:PU7");
-            rx.define("A10:PU7");
-#else
-            tx.define("A2:PU7");
-            rx.define("A15:PU3");
-#endif
-            init();
-            baud(115200, systemClock());
-        }
-
-        void trigger () override {
-            leds[5].toggle();
-        }
-
-        void yield () {
-            leds[1] = 0;
-            asm ("wfi"); // TODO
-            leds[1] = 1;
-        }
-
-        struct Chunk { uint8_t* buf; uint32_t len; };
-
-        auto recv () -> Chunk {
-            while (true) {
-                auto end = rxFill();
-                if (end != rxNext) {
-                    if (end < rxNext)
-                        end = sizeof rxBuf;
-                    ensure(end > rxNext);
-                    return {rxBuf+rxNext, (uint32_t) (end-rxNext)};
-                }
-                yield();
-            }
-        }
-
-        void didRecv (uint32_t n) {
-            rxNext = (rxNext + n) % sizeof rxBuf;
-        }
-
-        auto canSend () -> Chunk {
-            while (txBusy())
-                yield();
-            txNext = 0;
-            return {txBuf, sizeof txBuf}; // TODO no double buffering yet
-        }
-
-        void send (uint32_t n) {
-            txStart(txBuf + txNext, n);
-            txNext = (txNext + n) % sizeof txBuf;
-        }
-
-    private:
-        uint16_t rxNext = 0, txNext = 0;
-        uint8_t txBuf [100];
-    };
-}
-
 int main () {
 #if JEEH
     console.init();
@@ -126,15 +64,21 @@ int main () {
 
     mcu::Pin::define("A6:P,A5:P,A4:P,A3:P,A1:P,A0:P,B3:P", leds, 7);
 
-
+    mcu::Pin tx, rx; // TODO use the altpins info
 #if JEEH
-    mcu::Serial serial (1);
+    tx.define("A9:PU7");
+    rx.define("A10:PU7");
+    mcu::Uart serial (1);
 #else
     mcu::fastClock();
-    mcu::Serial serial (2);
-    if (mcu::systemClock() < 4000000)
-        serial.baud(4800, mcu::systemClock());
+    tx.define("A2:PU7");
+    rx.define("A15:PU3");
+    mcu::Uart serial (2);
 #endif
+    serial.init();
+    auto hz = mcu::systemClock();
+    serial.baud(hz < 4000000 ? 4800 : 115200, hz);
+
     leds[5] = 1;
     serial.txStart("abc", 3);
 
@@ -153,15 +97,13 @@ int main () {
         ensure(n < len);
         memcpy(ptr, x, n);
         serial.send(n);
-        //serial.txStart(x, n);
 
         auto [PTR, LEN] = serial.canSend();
-        auto X = "AKJSFH LAKJSDHG LAKSJDFH LAKSJDFH ALKSDJGH ASLDKJFHALSDK\n";
+        auto X = "       LAKJSDHG          LAKSJDFH          ASLDKJFHALSDK\n";
         auto N = strlen(X);
         ensure(N < LEN);
         memcpy(PTR, X, N);
         serial.send(N);
-        //serial.txStart(X, N);
 #endif
 #if 0
         auto t = mcu::millis(), t2 = t;

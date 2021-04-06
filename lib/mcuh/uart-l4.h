@@ -47,11 +47,43 @@ struct Uart : Device {
         dmaTX(CCR)[0] = 1; // EN
     }
 
+    struct Chunk { uint8_t* buf; uint32_t len; };
+
+    auto recv () -> Chunk {
+        uint16_t end;
+
+        waitWhile([&]() {
+            end = rxFill();
+            return end == rxNext;
+        });
+
+        if (end < rxNext)
+            end = sizeof rxBuf;
+        return {rxBuf+rxNext, (uint32_t) (end-rxNext)};
+    }
+
+    void didRecv (uint32_t n) {
+        rxNext = (rxNext + n) % sizeof rxBuf;
+    }
+
+    auto canSend () -> Chunk {
+        waitWhile([=]() { return txBusy(); });
+
+        txNext = 0;
+        return {txBuf, sizeof txBuf}; // TODO no double buffering yet
+    }
+
+    void send (uint32_t n) {
+        txStart(txBuf + txNext, n);
+        txNext = (txNext + n) % sizeof txBuf;
+    }
+
     DevInfo dev;
 //  void const* txNext;
 //  volatile uint16_t txFill = 0;
 protected:
-    uint8_t rxBuf [100];
+    uint8_t rxBuf [100], txBuf [100];
+    uint16_t rxNext = 0, txNext = 0;
 private:
     auto devReg (int off) const -> IOWord {
         return io32<0>(dev.base+off);
