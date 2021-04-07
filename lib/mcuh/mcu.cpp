@@ -155,8 +155,12 @@ namespace mcu {
         SCB(0x10) = 0b111;          // control & status
 
         auto t = ticks;
-        while (t == ticks)
-            asm ("wfi");
+        while (true) {
+            BlockIRQ crit;
+            if (t != ticks)
+                break;
+            idle();
+        }
     }
 
     auto millis () -> uint32_t {

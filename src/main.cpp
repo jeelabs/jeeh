@@ -92,24 +92,24 @@ int main () {
     for (int i = 0; i < 10000000; ++i) asm ("");
 
     leds[5] = 1;
-    //serial.txStart("abc\n", 4);
 
     while (true) {
-#if 0
+#if 1
         leds[6] = 1;
         mcu::msWait(100);
         leds[6] = 0;
         mcu::msWait(200);
-        mcu::msWait(200);
-        serial.txStart("abc", 3);
+        //mcu::msWait(200);
+        serial.send((uint8_t const*) "abc\n", 4);
 #else
         for (auto x = "12345678901234567890123456789012345678901234567890123456789012345678901234567890/\n";
                 *x != 0; ++x)
             serial.send((uint8_t const*) x, strlen(x));
-#endif
+
         auto [rp, rn] = serial.recv();
         printf("%p %u\n", rp, rn);
         serial.didRecv(rn);
+#endif
 #if 0
         auto t = mcu::millis(), t2 = t;
         printf("%b:", t);
