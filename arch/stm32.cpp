@@ -54,32 +54,10 @@ void enableClkPll (int freq) {
 }
 
 int fullSpeedClock () {
-    // not needed, since PlatformIO always includes a "-DF_CPU=..." setting
-#if 0
-    uint32_t mhz = 84; // always supported
-    switch (MMIO32(0xE0042000) & 0xFFF) {
-        case 0x458: // F410
-        case 0x431: // F411
-        case 0x441: // F412
-        case 0x463: // F413
-            mhz = 100; break;
-        case 0x413: // F4[01][57]
-            mhz = 168; break;
-        case 0x419: // F4[23][79]
-        case 0x421: // F446
-        case 0x434: // F4[67]9
-            mhz = 180; break;
-    }
-
-    enableClkPll(mhz);                   // using external crystal
-    enableSysTick(1000*mhz);             // systick once every 1 ms
-    return 1000000 * mhz;
-#else
     constexpr uint32_t mhz = F_CPU/1000000;
     enableClkPll(mhz);                   // using external crystal
     enableSysTick(1000*mhz);             // systick once every 1 ms
     return F_CPU;
-#endif
 }
 
 void powerDown (bool standby) {
@@ -94,12 +72,13 @@ void powerDown (bool standby) {
 
 #elif STM32F7
 
-void enableClkAt216MHz () {
-    MMIO32(Periph::flash+0x00) = 0x307; // flash acr, 7 wait states
+void enableClkPll (int freq) {
+    auto wait = freq <= 180 ? 5 : freq <= 210 ? 6 : 7;
+    MMIO32(Periph::flash+0x00) = 0x300 | wait; // flash acr, set wait states
     MMIO32(Periph::rcc+0x00) = (1<<16); // HSEON
     while (Periph::bit(Periph::rcc+0x00, 17) == 0) {} // wait for HSERDY
     MMIO32(Periph::rcc+0x08) = (4<<13) | (5<<10) | (1<<0); // prescaler w/ HSE
-    MMIO32(Periph::rcc+0x04) = (8<<24) | (1<<22) | (0<<16) | (432<<6) |
+    MMIO32(Periph::rcc+0x04) = (8<<24) | (1<<22) | (0<<16) | ((2*freq)<<6) |
                                 (XTAL<<0);
     Periph::bitSet(Periph::rcc+0x00, 24); // PLLON
     while (Periph::bit(Periph::rcc+0x00, 25) == 0) {} // wait for PLLRDY
@@ -107,10 +86,10 @@ void enableClkAt216MHz () {
 }
 
 int fullSpeedClock () {
-    constexpr uint32_t hz = 216000000;
-    enableClkAt216MHz();                 // using external crystal
-    enableSysTick(hz/1000);              // systick once every 1 ms
-    return hz;
+    constexpr uint32_t mhz = F_CPU/1000000;
+    enableClkPll(mhz);                   // using external crystal
+    enableSysTick(1000*mhz);             // systick once every 1 ms
+    return F_CPU;
 }
 
 void powerDown (bool standby) {
