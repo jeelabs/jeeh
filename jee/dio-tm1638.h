@@ -20,29 +20,28 @@ struct TM1638 {
         }
     }
 
-    static void send (uint8_t const* buf) {
+    static void send (uint8_t const buf [9]) {
         stb = 0;
-        out(0x88);
+        out(0x89);
         stb = 1;
         stb = 0;
         out(0xC0);
         for (int i = 0; i < 8; ++i) {
             out(buf[i]);
-            out(0);
+            out(buf[8]>>(7-i)); // right-most LED is bit 0
         }
         stb = 1;
     }
 
-    static uint32_t receive () {
+    static uint8_t receive () {
         stb = 0;
         out(0x42);
         dio = 1;
-        uint32_t r = 0;
+        uint8_t r = 0;
         for (int i = 0; i < 32; ++i) {
             clk = 1;
-            r <<= 1;
+            r |= dio << ((i&4 ? 3 : 7) - i/8); // right-most button is bit 0
             clk = 0;
-            r |= dio;
         }
         stb = 1;
         return r;
