@@ -544,7 +544,7 @@ struct Flash {
 
 // timers and PWM
 
-template< int N >
+template< int N, int CH=1 >
 struct Timer {
     constexpr static int tidx = N ==  1 ? 64 :  // TIM1,  APB2
                                 N ==  2 ?  0 :  // TIM2,  APB1
@@ -565,10 +565,12 @@ struct Timer {
     constexpr static uint32_t base  = 0x40000000 + 0x400*tidx;
     constexpr static uint32_t cr1   = base + 0x00;
     constexpr static uint32_t ccmr1 = base + 0x18;
+    constexpr static uint32_t ccmr2 = base + 0x1C;
     constexpr static uint32_t ccer  = base + 0x20;
     constexpr static uint32_t psc   = base + 0x28;
     constexpr static uint32_t arr   = base + 0x2C;
     constexpr static uint32_t ccr1  = base + 0x34;
+    constexpr static uint32_t ccr2  = base + 0x38;
 
     static void init (uint32_t limit, uint32_t scale =0) {
         if (tidx < 64)
@@ -582,9 +584,9 @@ struct Timer {
 
     // TODO TIM1 (and TIM8?) don't seem to work with PWM
     static void pwm (uint32_t match) {
-        MMIO16(ccmr1) = 0x60; // PWM mode
-        MMIO32(ccr1) = match;
-        Periph::bitSet(ccer, 0); // CC1E
+        MMIO16(CH <= 2 ? ccmr1 : ccmr2) = 0x6060; // PWM mode (both channels!)
+        MMIO32(ccr1 + 4*(CH-1)) = match;
+        Periph::bitSet(ccer, 4*(CH-1)); // CCxE
     }
 };
 
