@@ -26,12 +26,13 @@ VTable& VTableRam () {
 
     // if SCB_VTOR isn't pointing to vtable, then copy current vtable to it
     VTable* volatile& vtor = *(VTable* volatile*) 0xE000ED08;
-    if (vtor != &vtable) {
+    //if (vtor != &vtable) {
+    if (vtor == (void*) 0x0800'0000) {
         vtable = *vtor;
         vtor = &vtable;
     }
 
-    return vtable;
+    return *vtor;
 }
 
 // systick and delays
